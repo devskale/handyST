@@ -19,6 +19,7 @@ pub mod portable;
 mod secure_input;
 mod settings;
 mod shortcut;
+mod remote_transcribe;
 mod signal_handle;
 mod transcription_coordinator;
 mod tray;

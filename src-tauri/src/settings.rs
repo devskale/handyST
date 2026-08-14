@@ -437,6 +437,14 @@ pub struct AppSettings {
     pub theme: Theme,
     #[serde(default)]
     pub experimental_enabled: bool,
+    #[serde(default = "default_remote_transcription_enabled")]
+    pub remote_transcription_enabled: bool,
+    #[serde(default = "default_remote_transcription_base_url")]
+    pub remote_transcription_base_url: String,
+    #[serde(default, skip_serializing)]
+    pub remote_transcription_api_key: String,
+    #[serde(default = "default_remote_transcription_model")]
+    pub remote_transcription_model: String,
     #[serde(default)]
     pub lazy_stream_close: bool,
     #[serde(default)]
@@ -588,6 +596,19 @@ fn default_sound_theme() -> SoundTheme {
 
 fn default_theme() -> Theme {
     Theme::System
+}
+
+// sttts fork: remote transcription (OpenAI-compatible endpoint) defaults.
+// Points at the DGX Spark model-proxy gateway by default; token is read from
+// remote_transcription_api_key (kept out of settings.json via skip_serializing).
+fn default_remote_transcription_enabled() -> bool {
+    false
+}
+fn default_remote_transcription_base_url() -> String {
+    "http://dgxp:3001".to_string()
+}
+fn default_remote_transcription_model() -> String {
+    "nemotron-3.5-asr-streaming-0.6b".to_string()
 }
 
 fn default_post_process_enabled() -> bool {
