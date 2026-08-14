@@ -1023,7 +1023,44 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
         store.set("settings", serde_json::to_value(&settings).unwrap());
     }
 
+    // sttts: the remote transcription API key lives in the OS keychain, never
+    // in settings.json (the field is skip_serializing). Overlay it on every
+    // read so consumers always see the current secret.
+    settings.remote_transcription_api_key = load_remote_transcription_api_key();
+
     settings
+}
+
+/// Keychain coordinates for the remote transcription API key.
+pub const REMOTE_API_KEY_SERVICE: &str = "sttts";
+pub const REMOTE_API_KEY_ACCOUNT: &str = "remote_transcription_api_key";
+
+fn load_remote_transcription_api_key() -> String {
+    keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT)
+        .and_then(|entry| entry.get_password())
+        .unwrap_or_default()
+}
+
+/// Store (or, with an empty key, delete) the remote transcription API key in
+/// the OS keychain.
+pub fn store_remote_transcription_api_key(api_key: &str) -> Result<(), String> {
+    let entry = keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT)
+        .map_err(|e| format!("keychain error: {e}"))?;
+    if api_key.is_empty() {
+        // Absence of an entry is not an error (nothing stored yet).
+        let _ = entry.delete_credential();
+        return Ok(());
+    }
+    match entry.set_password(api_key) {
+        Ok(()) => Ok(()),
+        // Fall back to delete + re-create for backends that cannot update in place.
+        Err(_) => {
+            let _ = entry.delete_credential();
+            entry
+                .set_password(api_key)
+                .map_err(|e| format!("keychain error: {e}"))
+        }
+    }
 }
 
 /// Rebuilds settings from a store value that failed to deserialize as a whole.

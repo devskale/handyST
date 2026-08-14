@@ -1306,3 +1306,53 @@ pub fn change_show_tray_icon_setting(app: AppHandle, enabled: bool) -> Result<()
 }
 
 
+
+// sttts: remote transcription settings. The API key goes to the OS keychain
+// (never settings.json); the rest are plain settings fields.
+#[tauri::command]
+#[specta::specta]
+pub fn change_remote_transcription_enabled_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.remote_transcription_enabled = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_remote_transcription_base_url_setting(
+    app: AppHandle,
+    base_url: String,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.remote_transcription_base_url = base_url;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_remote_transcription_model_setting(
+    app: AppHandle,
+    model: String,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.remote_transcription_model = model;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_remote_transcription_api_key_setting(
+    app: AppHandle,
+    api_key: String,
+) -> Result<(), String> {
+    settings::store_remote_transcription_api_key(&api_key)?;
+    // Re-read so the in-memory value everywhere reflects the new key.
+    let _ = settings::get_settings(&app);
+    Ok(())
+}
