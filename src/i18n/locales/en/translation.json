@@ -11,12 +11,12 @@
   },
   "sidebar": {
     "general": "General",
-    "models": "Models",
     "advanced": "Advanced",
     "postProcessing": "Post Process",
     "history": "History",
     "debug": "Debug",
-    "about": "About"
+    "about": "About",
+    "remoteTranscription": "Remote Transcription"
   },
   "onboarding": {
     "subtitle": "To get started, choose a transcription model",
@@ -604,6 +604,25 @@
           "description": "High-performance tensor library for on-device machine learning inference",
           "details": "Handy's local speech-to-text is built on transcribe.cpp and ggml. Thanks to the amazing work by Georgi Gerganov and contributors."
         }
+      }
+    },
+    "remoteTranscription": {
+      "title": "Remote Transcription",
+      "enabled": {
+        "label": "Use remote transcription",
+        "description": "Send recordings to an OpenAI-compatible /v1/audio/transcriptions endpoint instead of local models."
+      },
+      "baseUrl": {
+        "label": "Base URL",
+        "description": "Root URL of the gateway, e.g. http://dgxp:3001."
+      },
+      "model": {
+        "label": "Model",
+        "description": "Model name passed in the multipart request."
+      },
+      "apiKey": {
+        "label": "API Key",
+        "description": "Bearer token, stored in the macOS Keychain."
       }
     }
   },

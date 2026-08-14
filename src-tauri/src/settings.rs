@@ -1035,6 +1035,10 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
 pub const REMOTE_API_KEY_SERVICE: &str = "sttts";
 pub const REMOTE_API_KEY_ACCOUNT: &str = "remote_transcription_api_key";
 
+pub fn load_remote_transcription_api_key_pub() -> String {
+    load_remote_transcription_api_key()
+}
+
 fn load_remote_transcription_api_key() -> String {
     keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT)
         .and_then(|entry| entry.get_password())

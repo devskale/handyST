@@ -1356,3 +1356,11 @@ pub fn change_remote_transcription_api_key_setting(
     let _ = settings::get_settings(&app);
     Ok(())
 }
+
+/// sttts: read the remote transcription API key from the keychain (the field
+/// is a secret, so it is not part of the specta AppSettings type).
+#[tauri::command]
+#[specta::specta]
+pub fn get_remote_transcription_api_key() -> Result<String, String> {
+    Ok(settings::load_remote_transcription_api_key_pub())
+}

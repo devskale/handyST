@@ -184,3 +184,16 @@ pub fn initialize_shortcuts(app: AppHandle) -> Result<(), String> {
     log::info!("Shortcuts initialized successfully");
     Ok(())
 }
+
+/// sttts: mark onboarding as completed. With the model-download step gone,
+/// this is called after the accessibility/permissions step.
+#[specta::specta]
+#[tauri::command]
+pub fn complete_onboarding(app: AppHandle) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    if !settings.onboarding_completed {
+        settings.onboarding_completed = true;
+        write_settings(&app, settings);
+    }
+    Ok(())
+}

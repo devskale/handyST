@@ -7,12 +7,12 @@ import {
   checkAccessibilityPermission,
   checkMicrophonePermission,
 } from "tauri-plugin-macos-permissions-api";
-import { ModelStateEvent, RecordingErrorEvent } from "./lib/types/events";
+import { RecordingErrorEvent } from "./lib/types/events";
 import "./App.css";
 import AccessibilityPermissions from "./components/AccessibilityPermissions";
 import SecureInputWarning from "./components/SecureInputWarning";
 import Footer from "./components/footer";
-import Onboarding, { AccessibilityOnboarding } from "./components/onboarding";
+import { AccessibilityOnboarding } from "./components/onboarding";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar, SidebarSection, SECTIONS_CONFIG } from "./components/Sidebar";
 import { WhatsNewGate } from "./components/whats-new";
@@ -21,7 +21,7 @@ import { useSettingsStore } from "./stores/settingsStore";
 import { commands } from "@/bindings";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
 
-type OnboardingStep = "accessibility" | "model" | "done";
+type OnboardingStep = "accessibility" | "done";
 
 const renderSettingsContent = (section: SidebarSection) => {
   const ActiveComponent =
@@ -34,9 +34,7 @@ function App() {
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep | null>(
     null,
   );
-  // Track if this is a returning user who just needs to grant permissions
-  // (vs a new user who needs full onboarding including model selection)
-  const [isReturningUser, setIsReturningUser] = useState(false);
+
   const [currentSection, setCurrentSection] =
     useState<SidebarSection>("general");
   const { settings, updateSetting } = useSettings();
@@ -153,26 +151,6 @@ function App() {
     };
   }, [t]);
 
-  // Listen for model loading failures and show a toast
-  useEffect(() => {
-    const unlisten = listen<ModelStateEvent>("model-state-changed", (event) => {
-      if (event.payload.event_type === "loading_failed") {
-        toast.error(
-          t("errors.modelLoadFailed", {
-            model:
-              event.payload.model_name || t("errors.modelLoadFailedUnknown"),
-          }),
-          {
-            description: event.payload.error,
-          },
-        );
-      }
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [t]);
-
   const revealMainWindowForPermissions = async () => {
     try {
       await commands.showMainWindowCommand();
@@ -191,8 +169,6 @@ function App() {
 
       if (hasCompletedOnboarding) {
         // Returning user - check if they need to grant permissions first
-        setIsReturningUser(true);
-
         if (currentPlatform === "macos") {
           try {
             const [hasAccessibility, hasMicrophone] = await Promise.all([
@@ -230,8 +206,7 @@ function App() {
 
         setOnboardingStep("done");
       } else {
-        // New user - start full onboarding
-        setIsReturningUser(false);
+        // New user - start onboarding at the permissions step
         setOnboardingStep("accessibility");
       }
     } catch (error) {
@@ -241,13 +216,10 @@ function App() {
   };
 
   const handleAccessibilityComplete = () => {
-    // Returning users already have models, skip to main app
-    // New users need to select a model
-    setOnboardingStep(isReturningUser ? "done" : "model");
-  };
-
-  const handleModelSelected = () => {
-    // Transition to main app - user has started a download
+    // sttts: no model-download step — mark onboarding done and enter the app.
+    commands.completeOnboarding().catch((e) => {
+      console.warn("Failed to complete onboarding:", e);
+    });
     setOnboardingStep("done");
   };
 
@@ -286,8 +258,6 @@ function App() {
     content = (
       <AccessibilityOnboarding onComplete={handleAccessibilityComplete} />
     );
-  } else if (onboardingStep === "model") {
-    content = <Onboarding onModelSelected={handleModelSelected} />;
   } else {
     content = (
       <div
