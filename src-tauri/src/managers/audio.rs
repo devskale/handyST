@@ -7,7 +7,6 @@ use crate::audio_toolkit::{
     AudioRecorder, SileroVad, VadPolicy,
 };
 use crate::helpers::clamshell;
-use crate::managers::transcription::StreamRouter;
 use crate::settings::{get_settings, AppSettings};
 use crate::utils;
 use log::{debug, error, info, trace, warn};
@@ -263,7 +262,6 @@ fn create_audio_recorder(
     vad_path: &Path,
     app_handle: &tauri::AppHandle,
     selected_channel: Option<u16>,
-    stream_router: Arc<StreamRouter>,
 ) -> Result<AudioRecorder, anyhow::Error> {
     // A single Silero engine covers both the offline and streaming policies (never
     // active at once within a recording), so the recorder reconfigures its
@@ -277,9 +275,9 @@ fn create_audio_recorder(
         VAD_ONSET_FRAMES,
     );
 
-    // Recorder with VAD, a spectrum-level callback that forwards level updates to
-    // the frontend, and an audio-frame callback that feeds live streaming via a
-    // shared `StreamRouter` (captured directly, not via Tauri state — see its docs).
+    // Recorder with VAD and a spectrum-level callback that forwards level
+    // updates to the frontend. (The sttts fork removed the streaming audio
+    // callback — inference is remote.)
     let recorder = AudioRecorder::new()
         .map_err(|e| anyhow::anyhow!("Failed to create AudioRecorder: {}", e))?
         .with_vad(
@@ -292,12 +290,6 @@ fn create_audio_recorder(
             let app_handle = app_handle.clone();
             move |levels| {
                 utils::emit_levels(&app_handle, &levels);
-            }
-        })
-        .with_audio_callback({
-            let router = stream_router;
-            move |frame| {
-                router.feed(frame);
             }
         });
 
@@ -337,7 +329,6 @@ pub struct AudioRecordingManager {
     mute_state: Arc<Mutex<MuteState>>,
     close_generation: Arc<AtomicU64>,
     cancel_generation: Arc<AtomicU64>,
-    stream_router: Arc<StreamRouter>,
     /// Lock-free mirror of "is the state in {Recording, Stopping}",
     /// maintained by `set_state()`. The hot-path `is_recording()` reads THIS
     /// instead of the std `state` mutex, so a UI poll can no longer deadlock
@@ -360,10 +351,7 @@ pub struct AudioRecordingManager {
 impl AudioRecordingManager {
     /* ---------- construction ------------------------------------------------ */
 
-    pub fn new(
-        app: &tauri::AppHandle,
-        stream_router: Arc<StreamRouter>,
-    ) -> Result<Self, anyhow::Error> {
+    pub fn new(app: &tauri::AppHandle) -> Result<Self, anyhow::Error> {
         let settings = get_settings(app);
         let mode = if settings.always_on_microphone {
             MicrophoneMode::AlwaysOn
@@ -382,7 +370,6 @@ impl AudioRecordingManager {
             mute_state: Arc::new(Mutex::new(MuteState::default())),
             close_generation: Arc::new(AtomicU64::new(0)),
             cancel_generation: Arc::new(AtomicU64::new(0)),
-            stream_router,
             recording_active: Arc::new(AtomicBool::new(false)),
             capture_generation: Arc::new(AtomicU64::new(0)),
             cached_device: Arc::new(Mutex::new(None)),
@@ -544,7 +531,6 @@ impl AudioRecordingManager {
                 &vad_path,
                 &self.app_handle,
                 settings.selected_channel,
-                Arc::clone(&self.stream_router),
             )?);
         }
         Ok(())

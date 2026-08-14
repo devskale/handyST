@@ -933,6 +933,10 @@ pub fn get_default_settings() -> AppSettings {
         extra_recording_buffer_ms: 0,
         vad_enabled: default_vad_enabled(),
         overlay_style: default_overlay_style(),
+        remote_transcription_enabled: default_remote_transcription_enabled(),
+        remote_transcription_base_url: default_remote_transcription_base_url(),
+        remote_transcription_api_key: String::new(),
+        remote_transcription_model: default_remote_transcription_model(),
     }
 }
 
