@@ -84,6 +84,10 @@ pub fn cancel_current_operation(app: &AppHandle) {
     let recording_was_active = audio_manager.is_recording();
     audio_manager.cancel_recording();
 
+    // Tear down the remote streaming session, if one is open
+    let transcription_manager = app.state::<Arc<TranscriptionManager>>();
+    transcription_manager.cancel_stream();
+
     // Update tray icon and hide overlay
     change_tray_icon(app, crate::tray::TrayIconState::Idle);
     hide_recording_overlay(app);

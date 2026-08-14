@@ -7,6 +7,7 @@ use crate::audio_toolkit::{
     AudioRecorder, SileroVad, VadPolicy,
 };
 use crate::helpers::clamshell;
+use crate::managers::transcription::StreamRouter;
 use crate::settings::{get_settings, AppSettings};
 use crate::utils;
 use log::{debug, error, info, trace, warn};
@@ -262,6 +263,7 @@ fn create_audio_recorder(
     vad_path: &Path,
     app_handle: &tauri::AppHandle,
     selected_channel: Option<u16>,
+    stream_router: Arc<StreamRouter>,
 ) -> Result<AudioRecorder, anyhow::Error> {
     // A single Silero engine covers both the offline and streaming policies (never
     // active at once within a recording), so the recorder reconfigures its
@@ -275,9 +277,9 @@ fn create_audio_recorder(
         VAD_ONSET_FRAMES,
     );
 
-    // Recorder with VAD and a spectrum-level callback that forwards level
-    // updates to the frontend. (The sttts fork removed the streaming audio
-    // callback — inference is remote.)
+    // Recorder with VAD, a spectrum-level callback that forwards level
+    // updates to the frontend, and an audio-frame callback that feeds the
+    // live remote stream (cheap no-op while no stream is open).
     let recorder = AudioRecorder::new()
         .map_err(|e| anyhow::anyhow!("Failed to create AudioRecorder: {}", e))?
         .with_vad(
@@ -291,6 +293,9 @@ fn create_audio_recorder(
             move |levels| {
                 utils::emit_levels(&app_handle, &levels);
             }
+        })
+        .with_audio_callback(move |frame| {
+            stream_router.feed(frame);
         });
 
     Ok(recorder)
@@ -346,12 +351,18 @@ pub struct AudioRecordingManager {
     /// so the retry re-enumerates. The system-default case is never cached —
     /// the recorder resolves the current default itself, cheaply.
     cached_device: Arc<Mutex<Option<(String, cpal::Device)>>>,
+    /// Forwards per-frame audio to the active remote stream (owned by the
+    /// transcription manager).
+    stream_router: Arc<StreamRouter>,
 }
 
 impl AudioRecordingManager {
     /* ---------- construction ------------------------------------------------ */
 
-    pub fn new(app: &tauri::AppHandle) -> Result<Self, anyhow::Error> {
+    pub fn new(
+        app: &tauri::AppHandle,
+        stream_router: Arc<StreamRouter>,
+    ) -> Result<Self, anyhow::Error> {
         let settings = get_settings(app);
         let mode = if settings.always_on_microphone {
             MicrophoneMode::AlwaysOn
@@ -373,6 +384,7 @@ impl AudioRecordingManager {
             recording_active: Arc::new(AtomicBool::new(false)),
             capture_generation: Arc::new(AtomicU64::new(0)),
             cached_device: Arc::new(Mutex::new(None)),
+            stream_router,
         };
 
         // Always-on?  Open immediately.
@@ -531,6 +543,7 @@ impl AudioRecordingManager {
                 &vad_path,
                 &self.app_handle,
                 settings.selected_channel,
+                Arc::clone(&self.stream_router),
             )?);
         }
         Ok(())

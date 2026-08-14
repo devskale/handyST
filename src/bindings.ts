@@ -958,13 +958,12 @@ recorder_blocked: boolean }
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
 export type SoundTheme = "marimba" | "pop" | "custom"
 /**
- * Phase of the streaming overlay card. Retained for frontend compatibility;
- * never emitted by the sttts fork.
+ * Phase of the streaming overlay card. The frontend starts each session in
+ * `Listening`; Rust emits the transition to `Working` (finalize/polish).
  */
 export type StreamPhase = "listening" | "working"
 /**
- * Emitted to switch the streaming overlay to a working spinner. Retained for
- * frontend compatibility; never emitted by the sttts fork.
+ * Emitted to switch the streaming overlay to a working spinner.
  */
 export type StreamPhaseEvent = { phase: StreamPhase; 
 /**
@@ -973,8 +972,8 @@ export type StreamPhaseEvent = { phase: StreamPhase;
 kind?: StreamWorkKind | null }
 /**
  * Live transcription snapshot emitted to the overlay during a streaming run.
- * Retained for frontend compatibility; the sttts fork never emits it (no
- * local streaming inference).
+ * The remote stream has no committed/tentative split — the latest partial
+ * arrives as `tentative` with an empty `committed`.
  */
 export type StreamTextEvent = { committed: string; tentative: string }
 /**

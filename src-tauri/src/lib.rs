@@ -18,6 +18,7 @@ pub mod portable;
 mod secure_input;
 mod settings;
 mod shortcut;
+mod remote_stream;
 mod remote_transcribe;
 mod signal_handle;
 mod transcription_coordinator;
@@ -132,13 +133,14 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     // after onboarding completes. This avoids triggering permission dialogs
     // on macOS before the user is ready.
 
-    // Initialize the managers. Transcription is remote (sttts); the recorder no
-    // longer feeds a local streaming engine.
+    // Initialize the managers. The recorder feeds live audio frames into the
+    // remote streaming session (no-op while no stream is open).
     let transcription_manager = Arc::new(
         TranscriptionManager::new(app_handle).expect("Failed to initialize transcription manager"),
     );
     let recording_manager = Arc::new(
-        AudioRecordingManager::new(app_handle).expect("Failed to initialize recording manager"),
+        AudioRecordingManager::new(app_handle, transcription_manager.stream_router())
+            .expect("Failed to initialize recording manager"),
     );
     let history_manager =
         Arc::new(HistoryManager::new(app_handle).expect("Failed to initialize history manager"));
@@ -377,7 +379,71 @@ fn run_headless_transcription(app: &AppHandle, args: &CliArgs) -> i32 {
 
     let tm = app.state::<Arc<TranscriptionManager>>();
 
+    // Live-stream the file through the WS endpoint when remote transcription
+    // is enabled (exercises the same session the app uses); batch otherwise.
+    let settings = get_settings(app);
     let runs = args.repeat.unwrap_or(1).max(1);
+    if settings.remote_transcription_enabled {
+        let mut times_ms: Vec<u64> = Vec::new();
+        let mut text = String::new();
+        for _ in 0..runs {
+            let t = Instant::now();
+            match tm.start_stream() {
+                Ok(()) => {
+                    // Feed in 100ms chunks as fast as the server accepts; the
+                    // recognizer runs much faster than real time.
+                    for chunk in samples.chunks(1_600) {
+                        tm.stream_router().feed(chunk);
+                    }
+                    match tm.finalize_stream() {
+                        Ok(Some(final_text)) => {
+                            text = tm.post_process(
+                                final_text,
+                                managers::transcription::language_hint(&settings).as_deref(),
+                            );
+                        }
+                        Ok(None) => unreachable!("stream open but finalize returned None"),
+                        Err(e) => {
+                            eprintln!("error: stream finalize failed: {}", e);
+                            return 1;
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("error: stream start failed: {}", e);
+                    return 1;
+                }
+            }
+            times_ms.push(t.elapsed().as_millis() as u64);
+        }
+        let best_ms = times_ms.iter().copied().min().unwrap_or(0);
+        let rtf = if best_ms > 0 {
+            audio_secs / (best_ms as f64 / 1000.0)
+        } else {
+            0.0
+        };
+        if args.json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "path": "stream",
+                    "audio_secs": audio_secs,
+                    "transcribe_ms": times_ms,
+                    "best_ms": best_ms,
+                    "rtf": rtf,
+                    "text": text,
+                })
+            );
+        } else {
+            println!(
+                "path=stream audio={:.2}s best={}ms rtf={:.2}x",
+                audio_secs, best_ms, rtf,
+            );
+            println!("text: {}", text);
+        }
+        return 0;
+    }
+
     let mut times_ms: Vec<u64> = Vec::new();
     let mut text = String::new();
     for _ in 0..runs {
@@ -666,7 +732,7 @@ pub fn run(cli_args: CliArgs) {
                     TranscriptionManager::new(&app_handle)
                         .expect("Failed to initialize transcription manager"),
                 );
-                app_handle.manage(transcription_manager);
+                app_handle.manage(transcription_manager.clone());
 
                 let handle = app_handle.clone();
                 let args = cli_args.clone();

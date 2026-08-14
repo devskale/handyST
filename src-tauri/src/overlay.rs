@@ -604,6 +604,11 @@ pub fn show_recording_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "recording");
 }
 
+/// Shows the streaming (Live) overlay window
+pub fn show_streaming_overlay(app_handle: &AppHandle) {
+    show_overlay_state(app_handle, "streaming");
+}
+
 /// Shows the transcribing overlay window
 pub fn show_transcribing_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "transcribing");

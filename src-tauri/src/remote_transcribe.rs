@@ -10,7 +10,6 @@
 use log::{debug, info};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::Deserialize;
-use std::io::Write;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
