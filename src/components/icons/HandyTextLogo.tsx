@@ -1,8 +1,9 @@
+/* eslint-disable i18next/no-literal-string -- brand wordmark */
 import React from "react";
 
 /**
- * handy.stream wordmark: "handy" in the app's fg color, ".stream" in the
- * brand accent — visually distinct from upstream Handy's pink script logo.
+ * handyST wordmark: "handy" in the app's fg color, "ST" in the brand
+ * accent — visually distinct from upstream Handy's pink script logo.
  */
 const HandyTextLogo = ({
   width,
@@ -18,7 +19,7 @@ const HandyTextLogo = ({
       width={width}
       height={height}
       className={className}
-      viewBox="0 0 560 130"
+      viewBox="0 0 510 130"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -42,15 +43,15 @@ const HandyTextLogo = ({
         handy
       </text>
       <text
-        x="352"
+        x="392"
         y="92"
         fontFamily="system-ui, -apple-system, sans-serif"
         fontSize="84"
-        fontWeight="400"
-        letterSpacing="-2"
+        fontWeight="700"
+        letterSpacing="0"
         className="logo-primary"
       >
-        .stream
+        ST
       </text>
     </svg>
   );
