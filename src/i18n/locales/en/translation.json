@@ -577,19 +577,19 @@
       "title": "About",
       "version": {
         "title": "Version",
-        "description": "Current version of Handy"
+        "description": "Current version of handy.stream"
       },
       "whatsNewUpdates": {
         "label": "Show What's New",
-        "description": "Show release notes after Handy updates"
+        "description": "Show release notes after handy.stream updates"
       },
       "appDataDirectory": {
         "title": "App Data Directory",
-        "description": "Location where Handy stores its data"
+        "description": "Location where handy.stream stores its data"
       },
       "sourceCode": {
         "title": "Source Code",
-        "description": "View source code and contribute",
+        "description": "handy.stream is a fork of Handy (cjpais/Handy) with remote streaming transcription",
         "button": "View on GitHub"
       },
       "supportDevelopment": {
@@ -601,7 +601,7 @@
         "title": "Acknowledgments",
         "ggml": {
           "title": "ggml",
-          "description": "High-performance tensor library for on-device machine learning inference",
+          "description": "Handy's on-device inference used transcribe.cpp and ggml — removed in this fork, with thanks to Georgi Gerganov and contributors",
           "details": "Handy's local speech-to-text is built on transcribe.cpp and ggml. Thanks to the amazing work by Georgi Gerganov and contributors."
         }
       }

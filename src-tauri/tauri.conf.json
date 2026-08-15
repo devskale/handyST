@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Handy",
-  "version": "0.9.5",
-  "identifier": "com.pais.handy",
+  "productName": "handy.stream",
+  "version": "0.1.0",
+  "identifier": "dev.skale.handy-stream",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -17,7 +17,9 @@
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["**"],
+          "allow": [
+            "**"
+          ],
           "requireLiteralLeadingDot": false
         }
       }
@@ -25,9 +27,11 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "targets": "all",
-    "resources": ["resources/**/*"],
+    "resources": [
+      "resources/**/*"
+    ],
     "license": "MIT",
     "icon": [
       "icons/32x32.png",
@@ -45,7 +49,10 @@
     },
     "linux": {
       "deb": {
-        "depends": ["libgtk-layer-shell0", "libopenblas0"],
+        "depends": [
+          "libgtk-layer-shell0",
+          "libopenblas0"
+        ],
         "files": {
           "/usr/lib/Handy": "transcribe-libs"
         }
@@ -83,5 +90,6 @@
         "https://github.com/cjpais/Handy/releases/latest/download/latest.json"
       ]
     }
-  }
+  },
+  "mainBinaryName": "handy-stream"
 }

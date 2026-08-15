@@ -602,7 +602,8 @@ fn default_theme() -> Theme {
 // Points at the DGX Spark model-proxy gateway by default; token is read from
 // remote_transcription_api_key (kept out of settings.json via skip_serializing).
 fn default_remote_transcription_enabled() -> bool {
-    false
+    // The fork is remote-only: without this the app can do nothing.
+    true
 }
 fn default_remote_transcription_base_url() -> String {
     "http://dgxp:3001".to_string()
