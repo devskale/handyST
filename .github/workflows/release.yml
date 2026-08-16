@@ -97,7 +97,7 @@ jobs:
         run: |
           VERSION=${VERSION}
           cd src-tauri/target/release/bundle
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "${{ inputs.tag }}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "handyST v$VERSION" \
             --notes "handyST v$VERSION — built by CI." \
