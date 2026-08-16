@@ -400,6 +400,10 @@
       "fillerWordRemoval": {
         "title": "Remove Filler Words",
         "description": "Removes common hesitation words from transcriptions. Turn off to keep them."
+      },
+      "recordingBuffer": {
+        "title": "Trailing recording buffer",
+        "description": "Keep recording this long after you stop, so last words still land. 0 = off."
       }
     },
     "postProcessing": {
@@ -567,10 +571,6 @@
       "reliablePaste": {
         "title": "Reliable Paste (Beta)",
         "description": "Restore the clipboard only after the target app actually reads the transcription, instead of after a fixed delay. Intended to fix old clipboard content being pasted under system load. Requires a clipboard paste method; macOS and Windows only."
-      },
-      "recordingBuffer": {
-        "title": "Extra Recording Buffer",
-        "description": "Extra time (in milliseconds) to keep recording after you release the key, to capture trailing audio. 0 = no extra buffer."
       },
       "keyboardDiagnostic": {
         "title": "Keyboard Diagnostic",

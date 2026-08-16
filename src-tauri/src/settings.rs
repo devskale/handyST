@@ -482,7 +482,7 @@ pub struct AppSettings {
     pub ort_accelerator: OrtAcceleratorSetting,
     #[serde(default = "default_transcribe_gpu_device")]
     pub transcribe_gpu_device: i32,
-    #[serde(default)]
+    #[serde(default = "default_extra_recording_buffer_ms")]
     pub extra_recording_buffer_ms: u64,
     #[serde(default = "default_vad_enabled")]
     pub vad_enabled: bool,
@@ -505,6 +505,12 @@ fn default_settings_schema_version() -> u32 {
 
 fn default_push_to_talk() -> bool {
     true
+}
+
+/// Trailing capture after stop, so words spoken just after releasing the key
+/// still land in the transcript (sttts: on by default).
+fn default_extra_recording_buffer_ms() -> u64 {
+    300
 }
 
 fn default_always_on_microphone() -> bool {
@@ -943,7 +949,7 @@ pub fn get_default_settings() -> AppSettings {
         transcribe_accelerator: TranscribeAcceleratorSetting::default(),
         ort_accelerator: OrtAcceleratorSetting::default(),
         transcribe_gpu_device: default_transcribe_gpu_device(),
-        extra_recording_buffer_ms: 0,
+        extra_recording_buffer_ms: default_extra_recording_buffer_ms(),
         vad_enabled: default_vad_enabled(),
         overlay_style: default_overlay_style(),
         remote_transcription_enabled: default_remote_transcription_enabled(),

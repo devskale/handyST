@@ -1,7 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Slider } from "../../ui/Slider";
-import { useSettings } from "../../../hooks/useSettings";
+import { Slider } from "../ui/Slider";
+import { useSettings } from "../../hooks/useSettings";
 
 interface RecordingBufferProps {
   descriptionMode?: "tooltip" | "inline";
@@ -28,11 +28,11 @@ export const RecordingBuffer: React.FC<RecordingBufferProps> = ({
       min={0}
       max={1500}
       step={50}
-      label={t("settings.debug.recordingBuffer.title")}
-      description={t("settings.debug.recordingBuffer.description")}
+      label={t("settings.advanced.recordingBuffer.title")}
+      description={t("settings.advanced.recordingBuffer.description")}
       descriptionMode={descriptionMode}
       grouped={grouped}
-      formatValue={(v) => `${v}ms`}
+      formatValue={(v: number) => `${v}ms`}
     />
   );
 };
