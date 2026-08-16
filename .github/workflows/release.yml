@@ -1,83 +1,78 @@
-name: "Release"
+name: release
 
-on: workflow_dispatch
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
-  create-release:
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    outputs:
-      release-id: ${{ steps.create-release.outputs.result }}
-      version: ${{ steps.get-version.outputs.version }}
+  macos:
+    runs-on: macos-14 # Apple Silicon
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
-      - name: Get version from tauri.conf.json
-        id: get-version
-        shell: bash
-        run: |
-          VERSION=$(grep -o '"version": "[^"]*"' src-tauri/tauri.conf.json | cut -d'"' -f4)
-          echo "Application version from tauri.conf.json: $VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Create Draft Release
-        id: create-release
-        uses: actions/github-script@v9
+      - uses: oven-sh/setup-bun@v2
         with:
-          script: |
-            const { data } = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: `v${{ steps.get-version.outputs.version }}`,
-              name: `v${{ steps.get-version.outputs.version }}`,
-              draft: true,
-              prerelease: false,
-              generate_release_notes: true
-            })
-            return data.id
+          bun-version: latest
 
-  publish-tauri:
-    permissions:
-      contents: write
-    needs: create-release
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: "macos-26" # for Arm based macs (M1 and above). Uses macOS 26 for Apple Intelligence SDK.
-            args: "--target aarch64-apple-darwin"
-            target: "aarch64-apple-darwin"
-          - platform: "macos-latest" # for Intel based macs.
-            args: "--target x86_64-apple-darwin"
-            target: "x86_64-apple-darwin"
-          - platform: "ubuntu-22.04" # Build .deb on 22.04
-            args: "--bundles deb"
-            target: "x86_64-unknown-linux-gnu"
-          - platform: "ubuntu-24.04" # Build AppImage and RPM on 24.04
-            args: "--bundles appimage,rpm"
-            target: "x86_64-unknown-linux-gnu"
-          - platform: "ubuntu-24.04-arm" # Build for ARM64 Linux
-            args: "--bundles appimage,deb,rpm"
-            target: "aarch64-unknown-linux-gnu"
-          - platform: "windows-latest"
-            args: ""
-            target: "x86_64-pc-windows-msvc"
-          - platform: "windows-11-arm" # for ARM64 Windows runner
-            args: "--target aarch64-pc-windows-msvc"
-            target: "aarch64-pc-windows-msvc"
+      - uses: dtolnay/rust-toolchain@stable
 
-    uses: ./.github/workflows/build.yml
-    with:
-      platform: ${{ matrix.platform }}
-      target: ${{ matrix.target }}
-      build-args: ${{ matrix.args }}
-      sign-binaries: true
-      asset-prefix: "handy"
-      upload-artifacts: false
-      release-id: ${{ needs.create-release.outputs.release-id }}
-      # Releases always build from scratch — never restore the Rust cache, so a
-      # stale cached native lib can never be linked into a shipped artifact.
-      no-cache: true
-    secrets: inherit
+      - name: Install deps
+        run: bun install
+
+      - name: Import code-signing identity
+        env:
+          MACOS_SIGNING_P12: ${{ secrets.MACOS_SIGNING_P12 }}
+          MACOS_SIGNING_PASSWORD: ${{ secrets.MACOS_SIGNING_PASSWORD }}
+        run: |
+          echo "$MACOS_SIGNING_P12" | base64 --decode > cert.p12
+          security create-keychain -p build build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p build build.keychain
+          security import cert.p12 -k build.keychain -P "$MACOS_SIGNING_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k build build.keychain
+          rm cert.p12
+
+      - name: Build signed release
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bun run tauri build
+
+      - name: Generate latest.json
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          SIG=$(cat src-tauri/target/release/bundle/macos/handyST.app.tar.gz.sig)
+          python3 - "$VERSION" "$SIG" > src-tauri/target/release/bundle/latest.json <<'PY'
+          import datetime, json, sys
+          version, sig = sys.argv[1], sys.argv[2]
+          print(json.dumps({
+              "version": version,
+              "notes": f"handyST {version}",
+              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": {
+                  "darwin-aarch64": {
+                      "signature": sig,
+                      "url": f"https://github.com/devskale/handyST/releases/download/v{version}/handyST.app.tar.gz",
+                  }
+              },
+          }, indent=2))
+          PY
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          cd src-tauri/target/release/bundle
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "handyST v$VERSION" \
+            --notes "handyST v$VERSION — built by CI." \
+            "dmg/handyST_${VERSION}_aarch64.dmg" \
+            "macos/handyST.app.tar.gz" \
+            "macos/handyST.app.tar.gz.sig" \
+            "latest.json"
