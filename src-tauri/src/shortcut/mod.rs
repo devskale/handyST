@@ -1395,7 +1395,14 @@ pub fn change_dictation_shortcut_setting(app: AppHandle, shortcut: String) -> Re
     let value = shortcut.trim().to_string();
     if !matches!(
         value.as_str(),
-        "none" | "mic_key" | "ctrl_double" | "cmd_left_double" | "cmd_right_double" | "globe_double"
+        "none"
+            | "mic_key"
+            | "ctrl_double"
+            | "cmd_left_double"
+            | "cmd_right_double"
+            | "opt_left_double"
+            | "opt_right_double"
+            | "globe_double"
     ) {
         return Err(format!("unknown dictation shortcut: {value}"));
     }

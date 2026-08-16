@@ -215,7 +215,9 @@
           "ctrlDouble": "Press Control key twice",
           "globeDouble": "Press Globe/Fn key twice",
           "cmdLeftDouble": "Press left ⌘ twice",
-          "cmdRightDouble": "Press right ⌘ twice"
+          "cmdRightDouble": "Press right ⌘ twice",
+          "optLeftDouble": "Press left ⌥ twice",
+          "optRightDouble": "Press right ⌥ twice"
         }
       },
       "favoriteLanguages": {

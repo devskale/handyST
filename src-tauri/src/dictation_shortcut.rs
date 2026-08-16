@@ -36,6 +36,8 @@ pub enum Trigger {
     CtrlDouble,
     CmdLeftDouble,
     CmdRightDouble,
+    OptLeftDouble,
+    OptRightDouble,
     GlobeDouble,
 }
 
@@ -46,6 +48,8 @@ impl Trigger {
             "ctrl_double" => Some(Self::CtrlDouble),
             "cmd_left_double" => Some(Self::CmdLeftDouble),
             "cmd_right_double" => Some(Self::CmdRightDouble),
+            "opt_left_double" => Some(Self::OptLeftDouble),
+            "opt_right_double" => Some(Self::OptRightDouble),
             "globe_double" => Some(Self::GlobeDouble),
             _ => None,
         }
@@ -56,6 +60,8 @@ impl Trigger {
             Self::CtrlDouble => Modifiers::CTRL,
             Self::CmdLeftDouble => Modifiers::CMD_LEFT,
             Self::CmdRightDouble => Modifiers::CMD_RIGHT,
+            Self::OptLeftDouble => Modifiers::OPT_LEFT,
+            Self::OptRightDouble => Modifiers::OPT_RIGHT,
             Self::GlobeDouble => Modifiers::FN,
             Self::MicKey => Modifiers::empty(),
         }
@@ -140,6 +146,8 @@ fn trigger_code(t: Option<Trigger>) -> u64 {
         Some(Trigger::CtrlDouble) => 2,
         Some(Trigger::CmdLeftDouble) => 3,
         Some(Trigger::CmdRightDouble) => 4,
+        Some(Trigger::OptLeftDouble) => 6,
+        Some(Trigger::OptRightDouble) => 7,
         Some(Trigger::GlobeDouble) => 5,
     }
 }
@@ -151,6 +159,8 @@ fn current_trigger() -> Option<Trigger> {
         3 => Some(Trigger::CmdLeftDouble),
         4 => Some(Trigger::CmdRightDouble),
         5 => Some(Trigger::GlobeDouble),
+        6 => Some(Trigger::OptLeftDouble),
+        7 => Some(Trigger::OptRightDouble),
         _ => None,
     }
 }
@@ -307,6 +317,7 @@ mod tests {
     fn trigger_parsing_roundtrip() {
         assert_eq!(Trigger::from_setting("mic_key"), Some(Trigger::MicKey));
         assert_eq!(Trigger::from_setting("globe_double"), Some(Trigger::GlobeDouble));
+        assert_eq!(Trigger::from_setting("opt_right_double"), Some(Trigger::OptRightDouble));
         assert_eq!(Trigger::from_setting("none"), None);
         assert_eq!(Trigger::from_setting(""), None);
     }

@@ -36,6 +36,14 @@ export const DictationShortcutSelector: React.FC<
       value: "cmd_right_double",
       label: t("settings.general.dictationShortcut.options.cmdRightDouble"),
     },
+    {
+      value: "opt_left_double",
+      label: t("settings.general.dictationShortcut.options.optLeftDouble"),
+    },
+    {
+      value: "opt_right_double",
+      label: t("settings.general.dictationShortcut.options.optRightDouble"),
+    },
   ];
 
   return (
