@@ -35,13 +35,14 @@ jobs:
           security default-keychain -s build.keychain
           security unlock-keychain -p build build.keychain
           security import cert.p12 -k build.keychain -P "$MACOS_SIGNING_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k build -T /usr/bin/codesign build.keychain
+          security set-key-partition-list -S apple-tool:,apple: -s -k build build.keychain
           security list-keychains -s build.keychain
           rm cert.p12
           # Fail fast if signing needs interaction — the bundler would hang
-          # for the full job limit instead.
+          # for the full job limit instead. (macOS has no timeout(1); the
+          # perl alarm kills a stuck codesign after 30s.)
           echo smoke > /tmp/codesign-smoke
-          codesign -f -s "handyST Development" /tmp/codesign-smoke
+          perl -e 'alarm 30; exec @ARGV' -- codesign -f -s "handyST Development" /tmp/codesign-smoke
           codesign --verify /tmp/codesign-smoke
 
       - name: Build signed release
