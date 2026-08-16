@@ -194,9 +194,17 @@
         "noResults": "No languages found",
         "auto": "Auto"
       },
-      "pushToTalk": {
-        "label": "Push To Talk",
-        "description": "Hold to record, release to stop"
+      "recordingMode": {
+        "label": "Recording mode",
+        "description": "How the hotkey controls recording",
+        "hold": {
+          "label": "Hold to talk",
+          "description": "Hold the hotkey while speaking, release to stop"
+        },
+        "click": {
+          "label": "Click start / stop",
+          "description": "Tap the hotkey once to start recording, tap again to stop"
+        }
       }
     },
     "models": {
