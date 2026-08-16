@@ -1,10 +1,15 @@
 name: release
 
+# Note: tag-push events are not delivered on this fork (verified — branch
+# pushes arrive, tag pushes never trigger), so releases are dispatched:
+#   gh workflow run release -f tag=v0.11.7
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.11.7; must exist). Empty = build the branch, no release."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -15,6 +20,8 @@ jobs:
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag != '' && inputs.tag || github.ref }}
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -59,8 +66,9 @@ jobs:
 
       - name: Generate latest.json
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF_NAME#v}
+          if [[ -n "${{ inputs.tag }}" ]]; then
+            VERSION=${{ inputs.tag }}
+            VERSION=${VERSION#v}
           else
             VERSION=$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
           fi
@@ -83,7 +91,7 @@ jobs:
           PY
 
       - name: Create release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: ${{ inputs.tag != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
