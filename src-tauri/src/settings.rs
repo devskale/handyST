@@ -1259,14 +1259,14 @@ mod tests {
             "bindings": {
                 "transcribe": {
                     "id": "transcribe",
-                    "name": "Transcribe",
+                    "name": "Dictate",
                     "description": "Converts your speech into text.",
                     "default_binding": "option+space",
                     "current_binding": "f13"
                 },
                 "transcribe_with_post_process": {
                     "id": "transcribe_with_post_process",
-                    "name": "Transcribe with Post-Processing",
+                    "name": "Dictate + Polish",
                     "description": "Converts your speech into text and applies AI post-processing.",
                     "default_binding": "option+shift+space",
                     "current_binding": "option+shift+space"

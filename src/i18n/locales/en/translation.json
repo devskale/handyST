@@ -104,11 +104,11 @@
       "description": "handyST needs a couple of permissions to work properly.",
       "microphone": {
         "title": "Microphone Access",
-        "description": "Required to hear your voice for transcription."
+        "description": "Required to hear your dictation."
       },
       "accessibility": {
         "title": "Accessibility Access",
-        "description": "Required to type transcribed text into your applications."
+        "description": "Required to type your dictation into your applications."
       },
       "grant": "Grant Permission",
       "granted": "Granted",
@@ -169,8 +169,8 @@
         "pressKeys": "Press keys...",
         "bindings": {
           "transcribe": {
-            "name": "Transcribe Shortcut",
-            "description": "The keyboard shortcut to record and transcribe your voice."
+            "name": "Dictation key",
+            "description": "The key that starts and stops dictation."
           },
           "cancel": {
             "name": "Cancel Shortcut",
@@ -178,7 +178,7 @@
           },
           "transcribe_with_post_process": {
             "name": "Post-Processing Hotkey",
-            "description": "Optional: A dedicated hotkey that always applies AI post-processing to your transcription."
+            "description": "Optional: a dedicated key that always polishes your dictation with AI post-processing."
           }
         },
         "errors": {
@@ -207,8 +207,8 @@
         }
       },
       "dictationShortcut": {
-        "label": "Dictation shortcut",
-        "description": "Extra trigger for start/stop, like macOS dictation — always toggles",
+        "label": "Extra trigger",
+        "description": "An extra way to start/stop dictation, like macOS — always toggles",
         "options": {
           "none": "None",
           "micKey": "Mic key (F5 position)",
@@ -312,7 +312,7 @@
       "overlay": {
         "style": {
           "title": "Overlay",
-          "description": "Choose the recording overlay: None hides it, Minimal shows a compact pill, Live shows transcription in real time as you speak (streaming-capable models only — look for the Streaming badge in the model picker). On Linux 'None' is recommended.",
+          "description": "Choose the recording overlay: None hides it, Minimal shows a compact pill, Live shows your dictation as you speak.",
           "options": {
             "none": "None",
             "minimal": "Minimal",
