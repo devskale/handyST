@@ -460,3 +460,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Language quick-switcher inside the streaming panel */
+.slang-row {
+  display: flex;
+  gap: 4px;
+  padding: 0 10px 6px;
+}
+.slang-chip {
+  border: none;
+  background: transparent;
+  color: var(--s-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.slang-chip:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+.slang-chip.active {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 18%, transparent);
+}

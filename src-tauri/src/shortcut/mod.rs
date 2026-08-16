@@ -1364,3 +1364,16 @@ pub fn change_remote_transcription_api_key_setting(
 pub fn get_remote_transcription_api_key() -> Result<String, String> {
     Ok(settings::load_remote_transcription_api_key_pub())
 }
+
+/// sttts: languages shown in the overlay quick switcher.
+#[tauri::command]
+#[specta::specta]
+pub fn change_favorite_languages_setting(
+    app: AppHandle,
+    languages: Vec<String>,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.favorite_languages = languages;
+    settings::write_settings(&app, settings);
+    Ok(())
+}

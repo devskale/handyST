@@ -445,6 +445,10 @@ pub struct AppSettings {
     pub remote_transcription_api_key: String,
     #[serde(default = "default_remote_transcription_model")]
     pub remote_transcription_model: String,
+    /// Languages offered by the overlay's quick switcher (BCP-47-ish codes,
+    /// "auto" = endpoint-side detection). First entry is the default.
+    #[serde(default = "default_favorite_languages")]
+    pub favorite_languages: Vec<String>,
     #[serde(default)]
     pub lazy_stream_close: bool,
     #[serde(default)]
@@ -610,6 +614,10 @@ fn default_remote_transcription_base_url() -> String {
 }
 fn default_remote_transcription_model() -> String {
     "nemotron-3.5-asr-streaming-0.6b".to_string()
+}
+
+fn default_favorite_languages() -> Vec<String> {
+    vec!["auto".to_string(), "de".to_string(), "en".to_string()]
 }
 
 fn default_post_process_enabled() -> bool {
@@ -938,6 +946,7 @@ pub fn get_default_settings() -> AppSettings {
         remote_transcription_base_url: default_remote_transcription_base_url(),
         remote_transcription_api_key: String::new(),
         remote_transcription_model: default_remote_transcription_model(),
+        favorite_languages: default_favorite_languages(),
     }
 }
 

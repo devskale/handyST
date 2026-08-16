@@ -556,6 +556,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_remote_transcription_enabled_setting,
             shortcut::change_remote_transcription_base_url_setting,
             shortcut::change_remote_transcription_model_setting,
+            shortcut::change_favorite_languages_setting,
             shortcut::change_remote_transcription_api_key_setting,
             shortcut::get_remote_transcription_api_key,
             shortcut::handy_keys::start_handy_keys_recording,

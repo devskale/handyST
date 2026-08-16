@@ -99,7 +99,18 @@ impl RemoteStream {
         cfg: &RemoteTranscribeConfig,
         on_partial: impl Fn(String) + Send + Sync + 'static,
     ) -> Result<Self, String> {
-        let url = stream_url(&cfg.base_url);
+        let mut url = stream_url(&cfg.base_url);
+        // Per-stream language hint (auto = endpoint-side detection). The
+        // option is applied before any audio is fed, matching the batch
+        // endpoint's `language` form field.
+        if let Some(lang) = cfg.language.as_deref() {
+            if !lang.is_empty() {
+                url.push_str(&format!(
+                    "?language={}",
+                    lang.trim().to_ascii_lowercase()
+                ));
+            }
+        }
         let mut request = url
             .as_str()
             .into_client_request()

@@ -43,6 +43,22 @@ const RecordingOverlay: React.FC = () => {
   // True once live text overflows the cap. A top overlay fades its top edge only
   // while overflowing, so the resting first line stays crisp flush under the pill.
   const [overflowing, setOverflowing] = useState(false);
+  // Language quick-switcher: favorites + the current selection. Applies to
+  // the next utterance (the stream is opened with it as the language hint).
+  const [favLanguages, setFavLanguages] = useState<string[]>([
+    "auto",
+    "de",
+    "en",
+  ]);
+  const [curLanguage, setCurLanguage] = useState("auto");
+
+  const switchLanguage = (lang: string) => {
+    if (lang === curLanguage) return;
+    setCurLanguage(lang);
+    commands.changeSelectedLanguageSetting(lang).catch((e) => {
+      console.warn("Failed to set language:", e);
+    });
+  };
 
   const smoothedLevelsRef = useRef<number[]>(Array(16).fill(0));
   // Live-text scroll-back: the text region "sticks" to the newest line while the
@@ -75,6 +91,10 @@ const RecordingOverlay: React.FC = () => {
             setPosition(
               settings.data.overlay_position === "top" ? "top" : "bottom",
             );
+            if (settings.data.favorite_languages?.length) {
+              setFavLanguages(settings.data.favorite_languages);
+            }
+            setCurLanguage(settings.data.selected_language || "auto");
           }
         } catch {
           // Keep the previous/default placement if settings can't be read.
@@ -265,6 +285,22 @@ const RecordingOverlay: React.FC = () => {
                 </p>
               </div>
             </div>
+          </div>
+          <div className="slang-row" dir="ltr">
+            {favLanguages.map((lang) => (
+              <button
+                key={lang}
+                className={`slang-chip ${lang === curLanguage ? "active" : ""}`}
+                onClick={() => switchLanguage(lang)}
+                title={
+                  lang === "auto"
+                    ? "Automatic language detection"
+                    : `Force ${lang.toUpperCase()} (next recording)`
+                }
+              >
+                {lang === "auto" ? "AUTO" : lang.toUpperCase()}
+              </button>
+            ))}
           </div>
           {working
             ? workingRow(
