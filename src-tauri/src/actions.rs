@@ -5,6 +5,9 @@ use crate::audio_toolkit::{is_microphone_access_denied, is_no_input_device_error
 use crate::managers::audio::AudioRecordingManager;
 use crate::managers::history::HistoryManager;
 use crate::managers::transcription::{language_hint, StreamWorkKind, TranscriptionManager};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+
 use crate::settings::{get_settings, AppSettings, OverlayStyle, APPLE_INTELLIGENCE_PROVIDER_ID};
 use crate::shortcut;
 use crate::tray::{change_tray_icon, TrayIconState};
@@ -18,7 +21,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 
@@ -32,6 +35,11 @@ struct RecordingErrorEvent {
 
 /// Drop guard that notifies the [`TranscriptionCoordinator`] when the
 /// transcription pipeline finishes — whether it completes normally or panics.
+/// Hard ceiling for one dictation's pipeline (stream finalize ≤5s, batch HTTP
+/// ≤30s, post-processing bounded by its own client) before the watchdog
+/// resets the UI.
+const STUCK_TRANSCRIPTION_TIMEOUT: Duration = Duration::from_secs(45);
+
 struct FinishGuard(AppHandle);
 impl Drop for FinishGuard {
     fn drop(&mut self) {
@@ -648,8 +656,43 @@ impl ShortcutAction for TranscribeAction {
         let post_process = self.post_process;
         let cancel_generation = rm.cancel_generation();
 
+        // Watchdog: if the transcription pipeline does not finish within
+        // STUCK_TRANSCRIPTION_TIMEOUT (stream finalize + batch fallback +
+        // post-processing are all bounded well below it), un-stick the UI
+        // with a toast instead of an eternal "transcribing" pill (sttts #13).
+        let pipeline_done = Arc::new(AtomicBool::new(false));
+        {
+            let done = Arc::clone(&pipeline_done);
+            let ah_watch = ah.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(STUCK_TRANSCRIPTION_TIMEOUT).await;
+                if !done.load(Ordering::Relaxed) {
+                    error!("transcription pipeline timed out after {:?} — forcing UI reset (see earlier log breadcrumbs)",
+                        STUCK_TRANSCRIPTION_TIMEOUT);
+                    let _ = ah_watch.emit(
+                        "transcription-error",
+                        format!(
+                            "Transcription timed out after {:.0}s and was aborted",
+                            STUCK_TRANSCRIPTION_TIMEOUT.as_secs_f64()
+                        ),
+                    );
+                    utils::hide_recording_overlay(&ah_watch);
+                    change_tray_icon(&ah_watch, TrayIconState::Idle);
+                }
+            });
+        }
+
         tauri::async_runtime::spawn(async move {
             let _guard = FinishGuard(ah.clone());
+            // Any exit of this task (including early returns and panics)
+            // retires the watchdog.
+            struct WatchdogDone(Arc<AtomicBool>);
+            impl Drop for WatchdogDone {
+                fn drop(&mut self) {
+                    self.0.store(true, Ordering::Relaxed);
+                }
+            }
+            let _wd = WatchdogDone(Arc::clone(&pipeline_done));
             debug!(
                 "Starting async transcription task for binding: {}",
                 binding_id
@@ -690,17 +733,38 @@ impl ShortcutAction for TranscribeAction {
                     // within ~100ms of stop); fall back to a batch POST when
                     // no stream is open or it failed. Runs while the WAV saves.
                     let transcription_time = Instant::now();
+                    debug!("sttts: transcription pipeline: reading language hint");
                     let language_hint = language_hint(&get_settings(&ah));
-                    let transcription_result = match tm.finalize_stream() {
+                    debug!("sttts: transcription pipeline: finalizing stream");
+                    let finalized = tm.finalize_stream();
+                    let transcription_result = match finalized {
                         Ok(Some(text)) if !text.trim().is_empty() => {
+                            debug!("sttts: transcription pipeline: post-processing stream final");
                             Ok(tm.post_process(text, language_hint.as_deref()))
                         }
-                        Ok(_) => tm.transcribe(samples),
+                        Ok(_) => {
+                            debug!("sttts: transcription pipeline: no stream final — batch on blocking pool");
+                            let tm_batch = Arc::clone(&tm);
+                            tauri::async_runtime::spawn_blocking(move || {
+                                tm_batch.transcribe(samples)
+                            })
+                            .await
+                            .unwrap_or_else(|e| Err(anyhow::anyhow!("batch task panicked: {e}")))
+                        }
                         Err(e) => {
                             warn!("remote stream finalize failed (batch fallback): {}", e);
-                            tm.transcribe(samples)
+                            let tm_batch = Arc::clone(&tm);
+                            tauri::async_runtime::spawn_blocking(move || {
+                                tm_batch.transcribe(samples)
+                            })
+                            .await
+                            .unwrap_or_else(|e| Err(anyhow::anyhow!("batch task panicked: {e}")))
                         }
                     };
+                    debug!(
+                        "sttts: transcription pipeline: transcript ready in {:?}",
+                        transcription_time.elapsed()
+                    );
 
                     // Await WAV save and verify
                     let wav_saved = match wav_handle.await {
