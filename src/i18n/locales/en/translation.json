@@ -205,6 +205,18 @@
           "label": "Click start / stop",
           "description": "Tap the hotkey once to start recording, tap again to stop"
         }
+      },
+      "dictationShortcut": {
+        "label": "Dictation shortcut",
+        "description": "Extra trigger for start/stop, like macOS dictation — always toggles",
+        "options": {
+          "none": "None",
+          "micKey": "Mic key (F5 position)",
+          "ctrlDouble": "Press Control key twice",
+          "globeDouble": "Press Globe/Fn key twice",
+          "cmdLeftDouble": "Press left ⌘ twice",
+          "cmdRightDouble": "Press right ⌘ twice"
+        }
       }
     },
     "models": {

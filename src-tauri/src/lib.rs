@@ -5,6 +5,7 @@ mod audio_feedback;
 pub mod audio_toolkit;
 mod autostart;
 pub mod cli;
+mod dictation_shortcut;
 mod clipboard;
 mod commands;
 mod helpers;
@@ -155,6 +156,10 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     // The frontend is responsible for calling the `initialize_shortcuts` command
     // after permissions are confirmed (on macOS) or after onboarding completes.
     // This matches the pattern used for Enigo initialization.
+
+    // macOS-dictation-style triggers (mic key / double-tap modifiers).
+    dictation_shortcut::init(app_handle);
+    dictation_shortcut::apply_setting(&settings::get_settings(app_handle).dictation_shortcut);
 
     // Set up signal handlers for toggling transcription. On Linux, SIGUSR1 is
     // deliberately not handled — it belongs to WebKitGTK's garbage collector
@@ -557,6 +562,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_remote_transcription_base_url_setting,
             shortcut::change_remote_transcription_model_setting,
             shortcut::change_favorite_languages_setting,
+            shortcut::change_dictation_shortcut_setting,
             shortcut::change_remote_transcription_api_key_setting,
             shortcut::get_remote_transcription_api_key,
             shortcut::handy_keys::start_handy_keys_recording,

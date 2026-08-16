@@ -1377,3 +1377,21 @@ pub fn change_favorite_languages_setting(
     settings::write_settings(&app, settings);
     Ok(())
 }
+
+/// sttts: macOS-dictation-style trigger (mic key / double-tap modifiers).
+#[tauri::command]
+#[specta::specta]
+pub fn change_dictation_shortcut_setting(app: AppHandle, shortcut: String) -> Result<(), String> {
+    let value = shortcut.trim().to_string();
+    if !matches!(
+        value.as_str(),
+        "none" | "mic_key" | "ctrl_double" | "cmd_left_double" | "cmd_right_double" | "globe_double"
+    ) {
+        return Err(format!("unknown dictation shortcut: {value}"));
+    }
+    let mut settings = settings::get_settings(&app);
+    settings.dictation_shortcut = value.clone();
+    settings::write_settings(&app, settings);
+    crate::dictation_shortcut::apply_setting(&value);
+    Ok(())
+}

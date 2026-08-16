@@ -449,6 +449,10 @@ pub struct AppSettings {
     /// "auto" = endpoint-side detection). First entry is the default.
     #[serde(default = "default_favorite_languages")]
     pub favorite_languages: Vec<String>,
+    /// macOS-dictation-style trigger: "none" | "mic_key" | "ctrl_double" |
+    /// "cmd_left_double" | "cmd_right_double" | "globe_double".
+    #[serde(default)]
+    pub dictation_shortcut: String,
     #[serde(default)]
     pub lazy_stream_close: bool,
     #[serde(default)]
@@ -947,6 +951,7 @@ pub fn get_default_settings() -> AppSettings {
         remote_transcription_api_key: String::new(),
         remote_transcription_model: default_remote_transcription_model(),
         favorite_languages: default_favorite_languages(),
+        dictation_shortcut: "none".to_string(),
     }
 }
 
