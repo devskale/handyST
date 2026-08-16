@@ -243,6 +243,9 @@ fn initialize_core_logic(app_handle: &AppHandle) {
             "copy_last_transcript" => {
                 tray::copy_last_transcript(app);
             }
+            "dictate" => {
+                run_toggle_dictation(app);
+            }
             "cancel" => {
                 use crate::utils::cancel_current_operation;
 
@@ -298,6 +301,26 @@ fn trigger_update_check(app: AppHandle) -> Result<(), String> {
 fn show_main_window_command(app: AppHandle) -> Result<(), String> {
     show_main_window(&app);
     Ok(())
+}
+
+/// Start dictation when idle, stop it when recording (tray item, overlay
+/// "Dictate again" button). Always toggle semantics.
+fn run_toggle_dictation(app: &AppHandle) {
+    use crate::actions::ACTION_MAP;
+    let rm = app.state::<Arc<AudioRecordingManager>>();
+    if rm.is_recording() {
+        if let Some(action) = ACTION_MAP.get("transcribe") {
+            action.stop(app, "transcribe", "toggle");
+        }
+    } else if let Some(action) = ACTION_MAP.get("transcribe") {
+        action.start(app, "transcribe", "toggle");
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+fn toggle_dictation(app: AppHandle) {
+    run_toggle_dictation(&app);
 }
 
 /// Convert an unexpected panic on the headless worker into a normal CLI
@@ -563,6 +586,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_remote_transcription_model_setting,
             shortcut::change_favorite_languages_setting,
             shortcut::change_dictation_shortcut_setting,
+            shortcut::change_auto_stop_silence_setting,
             shortcut::change_remote_transcription_api_key_setting,
             shortcut::get_remote_transcription_api_key,
             shortcut::handy_keys::start_handy_keys_recording,
@@ -571,6 +595,7 @@ pub fn run(cli_args: CliArgs) {
             secure_input::run_keyboard_diagnostic,
             trigger_update_check,
             show_main_window_command,
+            toggle_dictation,
             commands::cancel_operation,
             commands::is_portable,
             commands::get_app_dir_path,

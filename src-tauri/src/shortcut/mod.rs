@@ -1378,6 +1378,16 @@ pub fn change_favorite_languages_setting(
     Ok(())
 }
 
+/// sttts: silence auto-stop threshold (requires VAD).
+#[tauri::command]
+#[specta::specta]
+pub fn change_auto_stop_silence_setting(app: AppHandle, ms: u64) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.auto_stop_silence_ms = ms;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 /// sttts: macOS-dictation-style trigger (mic key / double-tap modifiers).
 #[tauri::command]
 #[specta::specta]

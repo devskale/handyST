@@ -207,8 +207,8 @@
         }
       },
       "dictationShortcut": {
-        "label": "Extra trigger",
-        "description": "An extra way to start/stop dictation, like macOS — always toggles",
+        "label": "Second trigger",
+        "description": "A second way to start/stop dictation (mic key or double-tap). The Dictation key above keeps working",
         "options": {
           "none": "None",
           "micKey": "Mic key (F5 position)",
@@ -217,6 +217,10 @@
           "cmdLeftDouble": "Press left ⌘ twice",
           "cmdRightDouble": "Press right ⌘ twice"
         }
+      },
+      "favoriteLanguages": {
+        "label": "Overlay language chips",
+        "description": "Languages offered by the switcher in the recording overlay (comma-separated)"
       }
     },
     "models": {
@@ -404,6 +408,10 @@
       "recordingBuffer": {
         "title": "Trailing recording buffer",
         "description": "Keep recording this long after you stop, so last words still land. 0 = off."
+      },
+      "autoStopSilence": {
+        "title": "Auto-stop on silence",
+        "description": "End the recording after this much silence following speech (like macOS dictation). Requires Voice Activity Detection; applies from the next recording."
       }
     },
     "postProcessing": {

@@ -8,6 +8,8 @@ import { SettingsGroup } from "../../ui/SettingsGroup";
 import { OutputDeviceSelector } from "../OutputDeviceSelector";
 import { RecordingModeSelector } from "./RecordingModeSelector";
 import { DictationShortcutSelector } from "./DictationShortcutSelector";
+import { LanguageSelector } from "../LanguageSelector";
+import { FavoriteLanguagesInput } from "./FavoriteLanguagesInput";
 import { AudioFeedback } from "../AudioFeedback";
 import { useSettings } from "../../../hooks/useSettings";
 import { VolumeSlider } from "../VolumeSlider";
@@ -24,6 +26,8 @@ export const GeneralSettings: React.FC = () => {
         <ShortcutInput shortcutId="transcribe" grouped={true} />
         <RecordingModeSelector descriptionMode="tooltip" grouped={true} />
         <DictationShortcutSelector descriptionMode="tooltip" grouped={true} />
+        <LanguageSelector descriptionMode="tooltip" grouped={true} />
+        <FavoriteLanguagesInput descriptionMode="tooltip" grouped={true} />
         {/* Cancel shortcut is hidden with push-to-talk (release key cancels) and on Linux (dynamic shortcut instability) */}
         {!isLinux && !pushToTalk && (
           <ShortcutInput shortcutId="cancel" grouped={true} />

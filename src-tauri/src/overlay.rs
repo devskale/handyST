@@ -604,6 +604,11 @@ pub fn show_recording_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "recording");
 }
 
+/// Shows the post-dictation overlay with a "Dictate again" button
+pub fn show_complete_overlay(app_handle: &AppHandle) {
+    show_overlay_state(app_handle, "complete");
+}
+
 /// Shows the streaming (Live) overlay window
 pub fn show_streaming_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "streaming");

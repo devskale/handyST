@@ -453,6 +453,10 @@ pub struct AppSettings {
     /// "cmd_left_double" | "cmd_right_double" | "globe_double".
     #[serde(default)]
     pub dictation_shortcut: String,
+    /// Stop recording automatically after this much VAD silence following
+    /// speech (ms). 0 = off. Requires Voice Activity Detection.
+    #[serde(default)]
+    pub auto_stop_silence_ms: u64,
     #[serde(default)]
     pub lazy_stream_close: bool,
     #[serde(default)]
@@ -958,6 +962,7 @@ pub fn get_default_settings() -> AppSettings {
         remote_transcription_model: default_remote_transcription_model(),
         favorite_languages: default_favorite_languages(),
         dictation_shortcut: "none".to_string(),
+        auto_stop_silence_ms: 0,
     }
 }
 

@@ -77,6 +77,10 @@ pub struct AudioRecorder {
     vad: Option<VadConfig>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
     audio_cb: Option<AudioFrameCallback>,
+    /// Silence auto-stop: fire the callback after this much VAD-silence
+    /// following speech. 0 = off.
+    auto_stop_ms: u64,
+    auto_stop_cb: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
     /// Which input channel to use. None = average all (original behavior).
     selected_channel: Option<usize>,
     /// Preferred stream config cached per device name. The two HAL property
@@ -97,6 +101,8 @@ impl AudioRecorder {
             vad: None,
             level_cb: None,
             audio_cb: None,
+            auto_stop_ms: 0,
+            auto_stop_cb: None,
             selected_channel: None,
             config_cache: Arc::new(Mutex::new(None)),
         })
@@ -139,6 +145,17 @@ impl AudioRecorder {
         self
     }
 
+    /// Stop recording automatically after `ms` of VAD silence following
+    /// speech. The callback fires once per recording, on the consumer thread.
+    pub fn with_auto_stop<F>(mut self, ms: u64, cb: F) -> Self
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.auto_stop_ms = ms;
+        self.auto_stop_cb = Some(Arc::new(cb));
+        self
+    }
+
     pub fn with_selected_channel(mut self, channel: Option<u16>) -> Self {
         self.set_selected_channel(channel);
         self
@@ -178,6 +195,8 @@ impl AudioRecorder {
         let level_cb = self.level_cb.clone();
         // Move the optional real-time audio frame callback into the worker thread
         let audio_cb = self.audio_cb.clone();
+        let auto_stop_ms = self.auto_stop_ms;
+        let auto_stop_cb = self.auto_stop_cb.clone();
         let selected_channel = self.selected_channel;
         let config_cache = Arc::clone(&self.config_cache);
 
@@ -314,6 +333,8 @@ impl AudioRecorder {
                         cmd_rx,
                         level_cb,
                         audio_cb,
+                        auto_stop_ms,
+                        auto_stop_cb,
                         stop_flag,
                         stream_running_at,
                     );
@@ -614,6 +635,8 @@ fn run_consumer(
     cmd_rx: mpsc::Receiver<Cmd>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
     audio_cb: Option<AudioFrameCallback>,
+    auto_stop_ms: u64,
+    auto_stop_cb: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
     stop_flag: Arc<AtomicBool>,
     stream_running_at: Instant,
 ) {
@@ -626,6 +649,13 @@ fn run_consumer(
     let mut processed_samples = Vec::<f32>::new();
     let mut recording = false;
     let mut vad_policy = VadPolicy::Offline;
+
+    // Silence auto-stop state: samples of silence accumulated after speech.
+    let auto_stop_threshold_samples =
+        (auto_stop_ms as usize) * constants::WHISPER_SAMPLE_RATE as usize / 1000;
+    let mut speech_seen = false;
+    let mut silence_samples = 0usize;
+    let mut auto_stop_fired = false;
 
     // ---------- latency instrumentation ---------------------------------- //
     // First-chunk arrival exposes the play()->samples-flowing gap; the
@@ -656,6 +686,7 @@ fn run_consumer(
         4000.0, // vocal_max_hz
     );
 
+    /// Returns true when the frame counted as speech (for silence tracking).
     fn handle_frame(
         samples: &[f32],
         recording: bool,
@@ -663,9 +694,9 @@ fn run_consumer(
         vad: &Option<VadConfig>,
         audio_cb: &Option<AudioFrameCallback>,
         out_buf: &mut Vec<f32>,
-    ) {
+    ) -> bool {
         if !recording {
-            return;
+            return false;
         }
 
         let mut emit = |buf: &[f32]| {
@@ -677,17 +708,23 @@ fn run_consumer(
 
         if vad_policy == VadPolicy::Disabled {
             emit(samples);
-            return;
+            // Without VAD there are no silence decisions; treat everything as
+            // speech so auto-stop never fires.
+            return true;
         }
 
         if let Some(cfg) = vad {
             let mut det = cfg.detector.lock().unwrap();
             match det.push_frame(samples).unwrap_or(VadFrame::Speech(samples)) {
-                VadFrame::Speech(buf) => emit(buf),
-                VadFrame::Noise => {}
+                VadFrame::Speech(buf) => {
+                    emit(buf);
+                    true
+                }
+                VadFrame::Noise => false,
             }
         } else {
             emit(samples);
+            true
         }
     }
 
@@ -710,6 +747,9 @@ fn run_consumer(
                     stop_flag.store(false, Ordering::Relaxed);
                     vad_policy = policy;
                     processed_samples.clear();
+                    speech_seen = false;
+                    silence_samples = 0;
+                    auto_stop_fired = false;
                     recording = true;
                     visualizer.reset();
                     frame_resampler.reset();
@@ -736,14 +776,14 @@ fn run_consumer(
                     // the recording, so feed it ahead of the drain below.
                     if let Some(AudioChunk::Samples(raw)) = pending.take() {
                         frame_resampler.push(&raw, &mut |frame: &[f32]| {
-                            handle_frame(
+                            let _ = handle_frame(
                                 frame,
                                 true,
                                 vad_policy,
                                 &vad,
                                 &audio_cb,
                                 &mut processed_samples,
-                            )
+                            );
                         });
                     }
 
@@ -755,14 +795,14 @@ fn run_consumer(
                         match sample_rx.recv_timeout(Duration::from_secs(2)) {
                             Ok(AudioChunk::Samples(remaining)) => {
                                 frame_resampler.push(&remaining, &mut |frame: &[f32]| {
-                                    handle_frame(
+                                    let _ = handle_frame(
                                         frame,
                                         true,
                                         vad_policy,
                                         &vad,
                                         &audio_cb,
                                         &mut processed_samples,
-                                    )
+                                    );
                                 });
                             }
                             Ok(AudioChunk::EndOfStream) => break,
@@ -774,14 +814,14 @@ fn run_consumer(
                     }
 
                     frame_resampler.finish(&mut |frame: &[f32]| {
-                        handle_frame(
+                        let _ = handle_frame(
                             frame,
                             true,
                             vad_policy,
                             &vad,
                             &audio_cb,
                             &mut processed_samples,
-                        )
+                        );
                     });
 
                     let _ = reply_tx.send(std::mem::take(&mut processed_samples));
@@ -830,14 +870,32 @@ fn run_consumer(
             }
 
             frame_resampler.push(&raw, &mut |frame: &[f32]| {
-                handle_frame(
+                let is_speech = handle_frame(
                     frame,
                     recording,
                     vad_policy,
                     &vad,
                     &audio_cb,
                     &mut processed_samples,
-                )
+                );
+                if auto_stop_threshold_samples > 0 && !auto_stop_fired {
+                    if is_speech {
+                        speech_seen = true;
+                        silence_samples = 0;
+                    } else if speech_seen {
+                        silence_samples += frame.len();
+                        if silence_samples >= auto_stop_threshold_samples {
+                            auto_stop_fired = true;
+                            log::info!(
+                                "auto-stop: {}ms of silence after speech",
+                                auto_stop_ms
+                            );
+                            if let Some(cb) = &auto_stop_cb {
+                                cb();
+                            }
+                        }
+                    }
+                }
             });
         }
 

@@ -264,6 +264,7 @@ fn create_audio_recorder(
     app_handle: &tauri::AppHandle,
     selected_channel: Option<u16>,
     stream_router: Arc<StreamRouter>,
+    auto_stop_silence_ms: u64,
 ) -> Result<AudioRecorder, anyhow::Error> {
     // A single Silero engine covers both the offline and streaming policies (never
     // active at once within a recording), so the recorder reconfigures its
@@ -297,6 +298,27 @@ fn create_audio_recorder(
         .with_audio_callback(move |frame| {
             stream_router.feed(frame);
         });
+
+    // Silence auto-stop: VAD says speech ended → run the same stop path as
+    // releasing the key (paste + finish). Only armed when the setting is on;
+    // the recorder re-reads nothing, so changes apply on the next mic open.
+    let recorder = if auto_stop_silence_ms > 0 {
+        let app = app_handle.clone();
+        recorder.with_auto_stop(auto_stop_silence_ms, move || {
+            // Stop only if still recording — the user may have beaten the
+            // timer; a stray stop on an idle recorder would be a no-op, but
+            // the guard keeps the log honest.
+            let rm = app.state::<Arc<AudioRecordingManager>>();
+            if !rm.is_recording() {
+                return;
+            }
+            if let Some(action) = crate::actions::ACTION_MAP.get("transcribe") {
+                action.stop(&app, "transcribe", "auto-stop");
+            }
+        })
+    } else {
+        recorder
+    };
 
     Ok(recorder)
 }
@@ -544,6 +566,7 @@ impl AudioRecordingManager {
                 &self.app_handle,
                 settings.selected_channel,
                 Arc::clone(&self.stream_router),
+                settings.auto_stop_silence_ms,
             )?);
         }
         Ok(())

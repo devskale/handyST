@@ -245,11 +245,15 @@ pub fn update_tray_menu(app: &AppHandle, locale: Option<&str>) {
         TrayIconState::Recording | TrayIconState::Transcribing => {
             let cancel_i = MenuItem::with_id(app, "cancel", &strings.cancel, true, None::<&str>)
                 .expect("failed to create cancel item");
+            let dictate_stop_i =
+                MenuItem::with_id(app, "dictate", "Stop dictation", true, None::<&str>)
+                    .expect("failed to create dictate item");
             Menu::with_items(
                 app,
                 &[
                     &version_i,
                     &separator(),
+                    &dictate_stop_i,
                     &cancel_i,
                     &separator(),
                     &copy_last_transcript_i,
@@ -262,20 +266,25 @@ pub fn update_tray_menu(app: &AppHandle, locale: Option<&str>) {
             )
             .expect("failed to create menu")
         }
-        TrayIconState::Idle => Menu::with_items(
-            app,
-            &[
-                &version_i,
-                &separator(),
-                &copy_last_transcript_i,
+        TrayIconState::Idle => {
+            let dictate_i = MenuItem::with_id(app, "dictate", "Dictate", true, None::<&str>)
+                .expect("failed to create dictate item");
+            Menu::with_items(
+                app,
+                &[
+                    &version_i,
+                    &separator(),
+                    &dictate_i,
+                    &copy_last_transcript_i,
                 &separator(),
                 &settings_i,
                 &check_updates_i,
-                &separator(),
-                &quit_i,
-            ],
-        )
-        .expect("failed to create menu"),
+                    &separator(),
+                    &quit_i,
+                ],
+            )
+            .expect("failed to create menu")
+        }
     };
 
     // Both layouts start with [version, separator, ...]; slot the warning in

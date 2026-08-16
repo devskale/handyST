@@ -473,6 +473,17 @@ async changeDictationShortcutSetting(shortcut: string) : Promise<Result<null, st
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * sttts: silence auto-stop threshold (requires VAD).
+ */
+async changeAutoStopSilenceSetting(ms: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_auto_stop_silence_setting", { ms }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeRemoteTranscriptionApiKeySetting(apiKey: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_remote_transcription_api_key_setting", { apiKey }) };
@@ -541,6 +552,9 @@ async showMainWindowCommand() : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async toggleDictation() : Promise<void> {
+    await TAURI_INVOKE("toggle_dictation");
 },
 async cancelOperation() : Promise<void> {
     await TAURI_INVOKE("cancel_operation");
@@ -903,7 +917,12 @@ favorite_languages?: string[];
  * macOS-dictation-style trigger: "none" | "mic_key" | "ctrl_double" |
  * "cmd_left_double" | "cmd_right_double" | "globe_double".
  */
-dictation_shortcut?: string; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; paste_delay_after_ms?: number; 
+dictation_shortcut?: string; 
+/**
+ * Stop recording automatically after this much VAD silence following
+ * speech (ms). 0 = off. Requires Voice Activity Detection.
+ */
+auto_stop_silence_ms?: number; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; paste_delay_after_ms?: number; 
 /**
  * Debug-gated ("beta") receipt-sequenced paste: restore the clipboard only
  * after the target app actually reads the transcript, instead of after a

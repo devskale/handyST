@@ -12,7 +12,12 @@ import type {
 import i18n, { syncLanguageFromSettings } from "@/i18n";
 import { getLanguageDirection } from "@/lib/utils/rtl";
 
-type OverlayState = "recording" | "streaming" | "transcribing" | "processing";
+type OverlayState =
+  | "recording"
+  | "streaming"
+  | "transcribing"
+  | "processing"
+  | "complete";
 
 // Number of reactive bars in the waveform (the simple, smoothed style shared by
 // every overlay form). Mic levels arrive as 16 FFT buckets; we take the first N.
@@ -177,6 +182,14 @@ const RecordingOverlay: React.FC = () => {
     setOverflowing(false);
   }, [session]);
 
+  // The complete pill lingers a few seconds with a "Dictate again" button,
+  // then fades on its own.
+  useEffect(() => {
+    if (state !== "complete" || !isVisible) return;
+    const id = setTimeout(() => setIsVisible(false), 5000);
+    return () => clearTimeout(id);
+  }, [state, isVisible, session]);
+
   if (!isVisible) return null;
 
   // Re-pin when the user is within ~a line of the bottom; unpin otherwise.
@@ -310,6 +323,37 @@ const RecordingOverlay: React.FC = () => {
                 true,
               )
             : listeningRow(open, true)}
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Complete pill: "Dictate again" after a finished dictation ----
+  if (state === "complete") {
+    return (
+      <div
+        dir={direction}
+        className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
+      >
+        <div className="scard compact cworking">
+          <button
+            className="sbase again-btn"
+            onClick={() => {
+              setIsVisible(false);
+              commands.toggleDictation();
+            }}
+          >
+            <span className="sbase-l">
+              <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                <path
+                  d="M8 2a6 6 0 1 1-5.66 4H4.2A4.6 4.6 0 1 0 8 3.4V6L4.5 3 8 0v2z"
+                  fill="currentColor"
+                />
+              </svg>
+            </span>
+            {/* eslint-disable-next-line i18next/no-literal-string -- action verb */}
+            <span className="swork-label">Dictate</span>
+          </button>
         </div>
       </div>
     );
