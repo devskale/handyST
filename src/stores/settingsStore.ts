@@ -161,6 +161,12 @@ const settingUpdaters: {
     commands.changeFillerWordRemovalEnabledSetting(value as boolean),
   show_tray_icon: (value) =>
     commands.changeShowTrayIconSetting(value as boolean),
+  dictation_shortcut: (value) =>
+    commands.changeDictationShortcutSetting(value as string),
+  auto_stop_silence_ms: (value) =>
+    commands.changeAutoStopSilenceSetting(value as number),
+  favorite_languages: (value) =>
+    commands.changeFavoriteLanguagesSetting(value as string[]),
   remote_transcription_enabled: (value) =>
     commands.changeRemoteTranscriptionEnabledSetting(value as boolean),
   remote_transcription_base_url: (value) =>
