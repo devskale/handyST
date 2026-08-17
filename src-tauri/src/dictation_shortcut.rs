@@ -212,9 +212,16 @@ pub fn init(app: &AppHandle) {
                     }
 
                     if let Some(changed) = event.changed_modifier {
+                        log::debug!(
+                            "dictation: flagsChanged bits={:?} down={} watched={:?}",
+                            changed,
+                            event.is_key_down,
+                            watched
+                        );
                         let watched_hit = !watched.is_empty() && changed.intersects(watched);
                         if event.is_key_down && watched_hit {
                             if detector.on_watched_tap(Instant::now()) {
+                                log::info!("dictation: double-tap detected — firing");
                                 fire(&app);
                             }
                         } else if event.is_key_down {
