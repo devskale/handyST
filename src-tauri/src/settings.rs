@@ -1602,16 +1602,7 @@ mod tests {
 /// "Loaded settings" debug log line stays safe to share (sttts).
 impl std::fmt::Debug for AppSettings {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut redacted = self.clone();
-        if !redacted.remote_transcription_api_key.is_empty() {
-            redacted.remote_transcription_api_key = "<redacted>".to_string();
-        }
-        for key in redacted.post_process_api_keys.values_mut() {
-            if !key.is_empty() {
-                *key = "<redacted>".to_string();
-            }
-        }
-        write!(f, "{:?}", DebugSettings(&redacted))
+        DebugSettings(self).fmt(f)
     }
 }
 
@@ -1635,6 +1626,16 @@ impl<'a> std::fmt::Debug for DebugSettings<'a> {
             .field("remote_transcription_enabled", &self.0.remote_transcription_enabled)
             .field("remote_transcription_base_url", &self.0.remote_transcription_base_url)
             .field("remote_transcription_model", &self.0.remote_transcription_model)
+            // Secrets follow the SecretMap "[REDACTED]" convention.
+            .field(
+                "remote_transcription_api_key",
+                &if self.0.remote_transcription_api_key.is_empty() {
+                    ""
+                } else {
+                    "[REDACTED]"
+                },
+            )
+            .field("post_process_api_keys", &self.0.post_process_api_keys)
             .finish_non_exhaustive()
     }
 }
