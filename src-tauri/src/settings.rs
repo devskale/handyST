@@ -335,7 +335,7 @@ impl std::ops::DerefMut for SecretMap {
 /// its `get_default_settings()` value when missing from a stored settings
 /// object, so a partial store can never fail the whole load (#1619).
 /// Field-level defaults below take precedence where present.
-#[derive(Serialize, Deserialize, Debug, Clone, Type)]
+#[derive(Serialize, Deserialize, Clone, Type)]
 #[serde(default)]
 pub struct AppSettings {
     /// Internal settings schema marker for one-time migrations. Fresh installs
@@ -1595,5 +1595,46 @@ mod tests {
         let out = format!("{:?}", map);
         assert!(!out.contains("secret"));
         assert!(out.contains("[REDACTED]"));
+    }
+}
+
+/// Debug output must never leak secrets: the api key is masked so the
+/// "Loaded settings" debug log line stays safe to share (sttts).
+impl std::fmt::Debug for AppSettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut redacted = self.clone();
+        if !redacted.remote_transcription_api_key.is_empty() {
+            redacted.remote_transcription_api_key = "<redacted>".to_string();
+        }
+        for key in redacted.post_process_api_keys.values_mut() {
+            if !key.is_empty() {
+                *key = "<redacted>".to_string();
+            }
+        }
+        write!(f, "{:?}", DebugSettings(&redacted))
+    }
+}
+
+/// Helper wrapper: since AppSettings now has a manual Debug impl, derive one
+/// for printing via this newtype.
+struct DebugSettings<'a>(&'a AppSettings);
+impl<'a> std::fmt::Debug for DebugSettings<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Print the meaningful fields without recursing into the manual impl.
+        f.debug_struct("AppSettings")
+            .field("settings_schema_version", &self.0.settings_schema_version)
+            .field("bindings", &self.0.bindings.keys().collect::<Vec<_>>())
+            .field("push_to_talk", &self.0.push_to_talk)
+            .field("selected_language", &self.0.selected_language)
+            .field("favorite_languages", &self.0.favorite_languages)
+            .field("dictation_shortcut", &self.0.dictation_shortcut)
+            .field("auto_stop_silence_ms", &self.0.auto_stop_silence_ms)
+            .field("extra_recording_buffer_ms", &self.0.extra_recording_buffer_ms)
+            .field("vad_enabled", &self.0.vad_enabled)
+            .field("overlay_style", &self.0.overlay_style)
+            .field("remote_transcription_enabled", &self.0.remote_transcription_enabled)
+            .field("remote_transcription_base_url", &self.0.remote_transcription_base_url)
+            .field("remote_transcription_model", &self.0.remote_transcription_model)
+            .finish_non_exhaustive()
     }
 }
