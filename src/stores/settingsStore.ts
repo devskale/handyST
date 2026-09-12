@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { listen } from "@tauri-apps/api/event";
-import type { AppSettings as Settings, AudioDevice } from "@/bindings";
+import type {
+  AppSettings as Settings,
+  AudioDevice,
+  TranscribeAcceleratorSetting,
+  OrtAcceleratorSetting,
+} from "@/bindings";
 import { commands } from "@/bindings";
 
 interface SettingsStore {
@@ -167,12 +172,14 @@ const settingUpdaters: {
     commands.changeAutoStopSilenceSetting(value as number),
   favorite_languages: (value) =>
     commands.changeFavoriteLanguagesSetting(value as string[]),
-  remote_transcription_enabled: (value) =>
-    commands.changeRemoteTranscriptionEnabledSetting(value as boolean),
-  remote_transcription_base_url: (value) =>
-    commands.changeRemoteTranscriptionBaseUrlSetting(value as string),
-  remote_transcription_model: (value) =>
-    commands.changeRemoteTranscriptionModelSetting(value as string),
+  transcribe_accelerator: (value) =>
+    commands.changeTranscribeAcceleratorSetting(
+      value as TranscribeAcceleratorSetting,
+    ),
+  ort_accelerator: (value) =>
+    commands.changeOrtAcceleratorSetting(value as OrtAcceleratorSetting),
+  transcribe_gpu_device: (value) =>
+    commands.changeTranscribeGpuDevice(value as number),
   extra_recording_buffer_ms: (value) =>
     commands.changeExtraRecordingBufferSetting(value as number),
 };
@@ -606,6 +613,17 @@ export const useSettingsStore = create<SettingsStore>()(
         checkCustomSounds(),
       ]);
 
+      // Re-fetch settings when the backend changes them (e.g. language
+      // reset during model switch). The backend is the source of truth.
+      listen("model-state-changed", () => {
+        get().refreshSettings();
+      });
+      listen<{ setting?: string }>("settings-changed", (event) => {
+        get().refreshSettings();
+        if (event.payload.setting === "selected_microphone") {
+          get().refreshAudioDevices();
+        }
+      });
     },
   })),
 );
