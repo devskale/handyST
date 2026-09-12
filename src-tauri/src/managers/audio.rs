@@ -1,8 +1,9 @@
+use crate::audio_toolkit::vad::VoiceActivityDetector as _;
 use crate::audio_toolkit::{
     list_input_devices,
     vad::{
-        SmoothedVad, VAD_OFFLINE_HANGOVER_FRAMES, VAD_ONSET_FRAMES, VAD_PREFILL_FRAMES,
-        VAD_STREAMING_HANGOVER_FRAMES,
+        frames_for_duration_ms, SmoothedVad, VAD_OFFLINE_HANGOVER_MS, VAD_ONSET_MS,
+        VAD_PREFILL_MS, VAD_STREAMING_HANGOVER_MS,
     },
     AudioRecorder, SileroVad, VadPolicy,
 };
@@ -271,11 +272,20 @@ fn create_audio_recorder(
     // hangover tail per session rather than keeping two ONNX sessions resident.
     let silero = SileroVad::new(vad_path, VAD_THRESHOLD)
         .map_err(|e| anyhow::anyhow!("Failed to create SileroVad: {}", e))?;
+    // sttts: keep the Silero backend (upstream added an Earshot option we can
+    // adopt later). Convert the time-based capture profile to the detector's
+    // frame size so the profile is backend-independent.
+    let frame_samples = silero.frame_samples();
+    let prefill_frames = frames_for_duration_ms(VAD_PREFILL_MS, frame_samples);
+    let offline_hangover_frames = frames_for_duration_ms(VAD_OFFLINE_HANGOVER_MS, frame_samples);
+    let streaming_hangover_frames =
+        frames_for_duration_ms(VAD_STREAMING_HANGOVER_MS, frame_samples);
+    let onset_frames = frames_for_duration_ms(VAD_ONSET_MS, frame_samples);
     let smoothed_vad = SmoothedVad::new(
         Box::new(silero),
-        VAD_PREFILL_FRAMES,
-        VAD_OFFLINE_HANGOVER_FRAMES,
-        VAD_ONSET_FRAMES,
+        prefill_frames,
+        offline_hangover_frames,
+        onset_frames,
     );
 
     // Recorder with VAD, a spectrum-level callback that forwards level
@@ -285,8 +295,8 @@ fn create_audio_recorder(
         .map_err(|e| anyhow::anyhow!("Failed to create AudioRecorder: {}", e))?
         .with_vad(
             Box::new(smoothed_vad),
-            VAD_OFFLINE_HANGOVER_FRAMES,
-            VAD_STREAMING_HANGOVER_FRAMES,
+            offline_hangover_frames,
+            streaming_hangover_frames,
         )
         .with_selected_channel(selected_channel)
         .with_level_callback({
