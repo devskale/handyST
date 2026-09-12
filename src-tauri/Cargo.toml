@@ -74,7 +74,7 @@ isolang = "2"
 chrono = "0.4"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
-handy-keys = "0.3.3"
+handy-keys = "0.3.4"
 ferrous-opencc = "0.2.3"
 clap = { version = "4", features = ["derive"] }
 specta = "=2.0.0-rc.22"
