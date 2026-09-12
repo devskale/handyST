@@ -334,6 +334,21 @@ impl std::ops::DerefMut for SecretMap {
 /// guarantees every field — including ones added in the future — falls back to
 /// its `get_default_settings()` value when missing from a stored settings
 /// object, so a partial store can never fail the whole load (#1619).
+/// How the transcribe shortcut's key events drive a recording.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ShortcutActivation {
+    /// Press to start, press again to stop.
+    Toggle,
+    /// Hold to record, release to stop.
+    PushToTalk,
+    /// Hold to record and release to stop, or tap to keep recording until the
+    /// next press. Which one it was is decided by how long the key was held
+    /// (`hold_threshold_ms`).
+    #[default]
+    HoldOrToggle,
+}
+
 /// Field-level defaults below take precedence where present.
 #[derive(Serialize, Deserialize, Clone, Type)]
 #[serde(default)]
@@ -347,8 +362,18 @@ pub struct AppSettings {
     /// default bindings for any missing keys before the settings are used.
     #[serde(default)]
     pub bindings: HashMap<String, ShortcutBinding>,
+    /// Legacy bool (retired): migrated to `shortcut_activation` in
+    /// `apply_settings_migrations`. Kept deserializable so old stores parse.
     #[serde(default = "default_push_to_talk")]
     pub push_to_talk: bool,
+    /// How the transcribe shortcut drives a recording (sttts: adopted from
+    /// upstream c62a5fc; "auto" = hold-or-toggle).
+    #[serde(default)]
+    pub shortcut_activation: ShortcutActivation,
+    /// Hold-or-toggle only: a press held at least this long is push-to-talk,
+    /// anything shorter is a tap that locks recording on.
+    #[serde(default = "default_hold_threshold_ms")]
+    pub hold_threshold_ms: u64,
     #[serde(default)]
     pub audio_feedback: bool,
     #[serde(default = "default_audio_feedback_volume")]
@@ -514,6 +539,10 @@ fn default_push_to_talk() -> bool {
 /// Trailing capture after stop, so words spoken just after releasing the key
 /// still land in the transcript (sttts: on by default).
 fn default_extra_recording_buffer_ms() -> u64 {
+    300
+}
+
+fn default_hold_threshold_ms() -> u64 {
     300
 }
 
@@ -899,6 +928,8 @@ pub fn get_default_settings() -> AppSettings {
         settings_schema_version: default_settings_schema_version(),
         bindings,
         push_to_talk: default_push_to_talk(),
+        shortcut_activation: ShortcutActivation::default(),
+        hold_threshold_ms: default_hold_threshold_ms(),
         audio_feedback: false,
         audio_feedback_volume: default_audio_feedback_volume(),
         sound_theme: default_sound_theme(),

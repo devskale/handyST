@@ -266,7 +266,13 @@ pub fn shutdown() {
 fn fire(app: &AppHandle) {
     if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
         debug!("dictation shortcut fired — toggling transcription");
-        coordinator.send_input("transcribe", "dictation-trigger", true, false);
+        coordinator.send_input(
+            "transcribe",
+            "dictation-trigger",
+            true,
+            crate::settings::ShortcutActivation::Toggle,
+            std::time::Duration::ZERO,
+        );
     } else {
         warn!("dictation shortcut: TranscriptionCoordinator not initialized");
     }

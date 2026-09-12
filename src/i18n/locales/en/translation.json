@@ -223,6 +223,20 @@
       "favoriteLanguages": {
         "label": "Overlay language chips",
         "description": "Languages offered by the switcher in the recording overlay (comma-separated)"
+      },
+      "shortcutBehavior": {
+        "title": "Shortcut behavior",
+        "description": "How the Dictation key starts and stops recording",
+        "options": {
+          "auto": "Auto",
+          "hold": "Hold",
+          "toggle": "Toggle"
+        },
+        "descriptions": {
+          "hold_or_toggle": "Hold to record, or tap to keep recording until the next tap",
+          "push_to_talk": "Records while you hold the key",
+          "toggle": "Tap to start, tap again to stop"
+        }
       }
     },
     "models": {

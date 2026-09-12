@@ -13,7 +13,7 @@ export { ChannelSelector } from "./ChannelSelector";
 export { ClamshellMicrophoneSelector } from "./ClamshellMicrophoneSelector";
 export { OutputDeviceSelector } from "./OutputDeviceSelector";
 export { AlwaysOnMicrophone } from "./AlwaysOnMicrophone";
-export { RecordingModeSelector } from "./general/RecordingModeSelector";
+export { ShortcutBehaviorSelector } from "./general/RecordingModeSelector";
 export { DictationShortcutSelector } from "./general/DictationShortcutSelector";
 export { AudioFeedback } from "./AudioFeedback";
 export { ShowOverlay } from "./ShowOverlay";

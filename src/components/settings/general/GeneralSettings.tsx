@@ -6,7 +6,7 @@ import { ChannelSelector } from "../ChannelSelector";
 import { ShortcutInput } from "../ShortcutInput";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 import { OutputDeviceSelector } from "../OutputDeviceSelector";
-import { RecordingModeSelector } from "./RecordingModeSelector";
+import { ShortcutBehaviorSelector } from "./RecordingModeSelector";
 import { DictationShortcutSelector } from "./DictationShortcutSelector";
 import { LanguageSelector } from "../LanguageSelector";
 import { FavoriteLanguagesInput } from "./FavoriteLanguagesInput";
@@ -18,13 +18,14 @@ import { MuteWhileRecording } from "../MuteWhileRecording";
 export const GeneralSettings: React.FC = () => {
   const { t } = useTranslation();
   const { audioFeedbackEnabled, getSetting } = useSettings();
-  const pushToTalk = getSetting("push_to_talk");
+  const pushToTalk =
+    (getSetting("shortcut_activation") || "hold_or_toggle") === "push_to_talk";
   const isLinux = type() === "linux";
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
       <SettingsGroup title={t("settings.general.title")}>
         <ShortcutInput shortcutId="transcribe" grouped={true} />
-        <RecordingModeSelector descriptionMode="tooltip" grouped={true} />
+        <ShortcutBehaviorSelector descriptionMode="tooltip" grouped={true} />
         <DictationShortcutSelector descriptionMode="tooltip" grouped={true} />
         <LanguageSelector descriptionMode="tooltip" grouped={true} />
         <FavoriteLanguagesInput descriptionMode="tooltip" grouped={true} />
