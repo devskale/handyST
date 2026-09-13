@@ -9,6 +9,8 @@ import type {
 import { commands } from "@/bindings";
 
 interface SettingsStore {
+  // null until loadUpdateChecksLocked() resolves (upstream b026660)
+  updateChecksLocked: boolean | null;
   settings: Settings | null;
   defaultSettings: Settings | null;
   isLoading: boolean;
@@ -169,6 +171,14 @@ const settingUpdaters: {
     commands.changeFillerWordRemovalEnabledSetting(value as boolean),
   show_tray_icon: (value) =>
     commands.changeShowTrayIconSetting(value as boolean),
+  vad_backend: async (value) => {
+    const result = await commands.changeVadBackendSetting(
+      value as Parameters<typeof commands.changeVadBackendSetting>[0],
+    );
+    if (result.status === "error") {
+      throw new Error(result.error);
+    }
+  },
   dictation_shortcut: (value) =>
     commands.changeDictationShortcutSetting(value as string),
   auto_stop_silence_ms: (value) =>
@@ -181,6 +191,8 @@ const settingUpdaters: {
 
 export const useSettingsStore = create<SettingsStore>()(
   subscribeWithSelector((set, get) => ({
+    updateChecksLocked: null,
+
     settings: null,
     defaultSettings: null,
     isLoading: true,
@@ -207,6 +219,15 @@ export const useSettingsStore = create<SettingsStore>()(
     isUpdatingKey: (key) => get().isUpdating[key] || false,
 
     // Load settings from store
+    loadUpdateChecksLocked: async () => {
+      try {
+        const locked = await commands.getUpdateChecksLocked();
+        set({ updateChecksLocked: Boolean(locked) });
+      } catch {
+        set({ updateChecksLocked: false });
+      }
+    },
+
     refreshSettings: async () => {
       try {
         const result = await commands.getAppSettings();

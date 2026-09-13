@@ -1399,6 +1399,19 @@ pub fn change_favorite_languages_setting(
     Ok(())
 }
 
+/// VAD backend selection (applies from the next microphone open).
+#[tauri::command]
+#[specta::specta]
+pub fn change_vad_backend_setting(
+    app: AppHandle,
+    backend: settings::VadBackend,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.vad_backend = backend;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 /// sttts: silence auto-stop threshold (requires VAD).
 #[tauri::command]
 #[specta::specta]

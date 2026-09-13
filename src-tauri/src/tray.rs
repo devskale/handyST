@@ -179,6 +179,11 @@ fn version_label() -> String {
     }
 }
 
+/// sttts compat for upstream's single-writer tray callers.
+pub fn set_tray_state(app: &AppHandle, state: TrayIconState) {
+    update_tray_menu(app, None);
+}
+
 pub fn update_tray_menu(app: &AppHandle, locale: Option<&str>) {
     let state = app.state::<CurrentTrayIconState>().get();
     let settings = settings::get_settings(app);

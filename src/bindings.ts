@@ -490,6 +490,17 @@ async changeDictationShortcutSetting(shortcut: string) : Promise<Result<null, st
 }
 },
 /**
+ * VAD backend selection (applies from the next microphone open).
+ */
+async changeVadBackendSetting(backend: VadBackend) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_vad_backend_setting", { backend }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * sttts: silence auto-stop threshold (requires VAD).
  */
 async changeAutoStopSilenceSetting(ms: number) : Promise<Result<null, string>> {
@@ -574,6 +585,9 @@ async toggleDictation() : Promise<void> {
 },
 async cancelOperation() : Promise<void> {
     await TAURI_INVOKE("cancel_operation");
+},
+async getUpdateChecksLocked() : Promise<boolean> {
+    return await TAURI_INVOKE("get_update_checks_locked");
 },
 async isPortable() : Promise<boolean> {
     return await TAURI_INVOKE("is_portable");
@@ -949,7 +963,7 @@ dictation_shortcut?: string;
  * Stop recording automatically after this much VAD silence following
  * speech (ms). 0 = off. Requires Voice Activity Detection.
  */
-auto_stop_silence_ms?: number; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; paste_delay_after_ms?: number; 
+auto_stop_silence_ms?: number; vad_backend?: VadBackend; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; paste_delay_after_ms?: number; 
 /**
  * Debug-gated ("beta") receipt-sequenced paste: restore the clipboard only
  * after the target app actually reads the transcript, instead of after a
@@ -1034,10 +1048,6 @@ uncovered_bindings: string[];
  */
 recorder_blocked: boolean }
 /**
- * The container-level `serde(default)` (backed by the `Default` impl below)
- * guarantees every field — including ones added in the future — falls back to
- * its `get_default_settings()` value when missing from a stored settings
- * object, so a partial store can never fail the whole load (#1619).
  * How the transcribe shortcut's key events drive a recording.
  */
 export type ShortcutActivation = 
@@ -1087,6 +1097,14 @@ export type StreamWorkKind = "transcribing" | "polishing"
 export type Theme = "system" | "light" | "dark"
 export type TranscribeAcceleratorSetting = "auto" | "cpu" | "gpu"
 export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "xdotool"
+/**
+ * The container-level `serde(default)` (backed by the `Default` impl below)
+ * guarantees every field — including ones added in the future — falls back to
+ * its `get_default_settings()` value when missing from a stored settings
+ * object, so a partial store can never fail the whole load (#1619).
+ * VAD backend selection (upstream 20ada47; sttts keeps Silero default).
+ */
+export type VadBackend = "silero" | "earshot"
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }
 
 /** tauri-specta globals **/

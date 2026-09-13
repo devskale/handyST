@@ -334,6 +334,15 @@ impl std::ops::DerefMut for SecretMap {
 /// guarantees every field — including ones added in the future — falls back to
 /// its `get_default_settings()` value when missing from a stored settings
 /// object, so a partial store can never fail the whole load (#1619).
+/// VAD backend selection (upstream 20ada47; sttts keeps Silero default).
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum VadBackend {
+    #[default]
+    Silero,
+    Earshot,
+}
+
 /// How the transcribe shortcut's key events drive a recording.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
 #[serde(rename_all = "snake_case")]
@@ -482,6 +491,8 @@ pub struct AppSettings {
     /// speech (ms). 0 = off. Requires Voice Activity Detection.
     #[serde(default)]
     pub auto_stop_silence_ms: u64,
+    #[serde(default)]
+    pub vad_backend: VadBackend,
     #[serde(default)]
     pub lazy_stream_close: bool,
     #[serde(default)]
@@ -994,6 +1005,7 @@ pub fn get_default_settings() -> AppSettings {
         favorite_languages: default_favorite_languages(),
         dictation_shortcut: "none".to_string(),
         auto_stop_silence_ms: 0,
+        vad_backend: VadBackend::default(),
     }
 }
 
@@ -1222,6 +1234,14 @@ fn apply_settings_migrations(
     }
 
     updated
+}
+
+/// Update checks are forced off (without touching the persisted setting) when
+/// `HANDY_DISABLE_UPDATER` is set — e.g. by the Nix package (upstream b026660).
+pub fn update_checks_forced_disabled() -> bool {
+    use std::sync::OnceLock;
+    static IS_UPDATER_DISABLED: OnceLock<bool> = OnceLock::new();
+    *IS_UPDATER_DISABLED.get_or_init(|| crate::utils::env_flag_enabled("HANDY_DISABLE_UPDATER"))
 }
 
 pub fn write_settings(app: &AppHandle, settings: AppSettings) {
