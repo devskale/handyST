@@ -740,7 +740,12 @@ impl ShortcutAction for TranscribeAction {
                     let transcription_result = match finalized {
                         Ok(Some(text)) if !text.trim().is_empty() => {
                             debug!("sttts: transcription pipeline: post-processing stream final");
-                            Ok(tm.post_process(text, language_hint.as_deref()))
+                            let processed = tm.post_process(text, language_hint.as_deref());
+                            // Partials lag by up to one server chunk, so the
+                            // last syllables were never in the bubble. Show
+                            // the complete final there before pasting.
+                            tm.emit_stream_final(&processed);
+                            Ok(processed)
                         }
                         Ok(_) => {
                             debug!("sttts: transcription pipeline: no stream final — batch on blocking pool");
@@ -870,8 +875,12 @@ impl ShortcutAction for TranscribeAction {
                                             let _ = ah_clone.emit("paste-error", ());
                                         }
                                     }
-                                    // Linger with a "Dictate again" button
-                                    // instead of vanishing instantly.
+                                    // Let the user read the complete final in
+                                    // the bubble (partials lag up to one server
+                                    // chunk, so the last syllables appear here
+                                    // for the first time) before it collapses
+                                    // into the "Dictate again" pill.
+                                    std::thread::sleep(std::time::Duration::from_millis(700));
                                     crate::overlay::show_complete_overlay(&ah_clone);
                                     change_tray_icon(&ah_clone, TrayIconState::Idle);
                                 })

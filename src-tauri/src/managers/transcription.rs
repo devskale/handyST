@@ -210,6 +210,17 @@ impl TranscriptionManager {
         .emit(&self.app_handle);
     }
 
+    /// Push the (post-processed) final transcript into the streaming overlay.
+    /// Partials lag the audio by up to one server chunk (~560ms), so without
+    /// this the last spoken syllables never appear in the bubble (sttts).
+    pub fn emit_stream_final(&self, text: &str) {
+        let _ = StreamTextEvent {
+            committed: text.to_string(),
+            tentative: String::new(),
+        }
+        .emit(&self.app_handle);
+    }
+
     /// Transcribe recorded PCM via the remote OpenAI-compatible endpoint and
     /// apply the shared text post-processing.
     pub fn transcribe(&self, audio: Vec<f32>) -> Result<String> {
