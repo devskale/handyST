@@ -493,6 +493,10 @@ pub struct AppSettings {
     pub auto_stop_silence_ms: u64,
     #[serde(default)]
     pub vad_backend: VadBackend,
+    /// sttts: keep a small dictation pill visible while idle, so a click can
+    /// start a recording without the keyboard.
+    #[serde(default = "default_overlay_idle_pill")]
+    pub overlay_idle_pill: bool,
     #[serde(default)]
     pub lazy_stream_close: bool,
     #[serde(default)]
@@ -555,6 +559,10 @@ fn default_extra_recording_buffer_ms() -> u64 {
 
 fn default_hold_threshold_ms() -> u64 {
     300
+}
+
+fn default_overlay_idle_pill() -> bool {
+    true
 }
 
 fn default_always_on_microphone() -> bool {
@@ -1006,6 +1014,7 @@ pub fn get_default_settings() -> AppSettings {
         dictation_shortcut: "none".to_string(),
         auto_stop_silence_ms: 0,
         vad_backend: VadBackend::default(),
+        overlay_idle_pill: default_overlay_idle_pill(),
     }
 }
 

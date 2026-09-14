@@ -7,6 +7,7 @@ import { ShortcutInput } from "../ShortcutInput";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 import { OutputDeviceSelector } from "../OutputDeviceSelector";
 import { ShortcutBehaviorSelector } from "./RecordingModeSelector";
+import { IdlePillToggle } from "../IdlePillToggle";
 import { DictationShortcutSelector } from "./DictationShortcutSelector";
 import { LanguageSelector } from "../LanguageSelector";
 import { FavoriteLanguagesInput } from "./FavoriteLanguagesInput";
@@ -26,6 +27,7 @@ export const GeneralSettings: React.FC = () => {
       <SettingsGroup title={t("settings.general.title")}>
         <ShortcutInput shortcutId="transcribe" grouped={true} />
         <ShortcutBehaviorSelector descriptionMode="tooltip" grouped={true} />
+        <IdlePillToggle descriptionMode="tooltip" grouped={true} />
         <DictationShortcutSelector descriptionMode="tooltip" grouped={true} />
         <LanguageSelector descriptionMode="tooltip" grouped={true} />
         <FavoriteLanguagesInput descriptionMode="tooltip" grouped={true} />

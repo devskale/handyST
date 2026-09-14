@@ -17,7 +17,8 @@ type OverlayState =
   | "streaming"
   | "transcribing"
   | "processing"
-  | "complete";
+  | "complete"
+  | "idle";
 
 // Number of reactive bars in the waveform (the simple, smoothed style shared by
 // every overlay form). Mic levels arrive as 16 FFT buckets; we take the first N.
@@ -183,10 +184,13 @@ const RecordingOverlay: React.FC = () => {
   }, [session]);
 
   // The complete pill lingers a few seconds with a "Dictate again" button,
-  // then fades on its own.
+  // then fades on its own — and hands over to the persistent idle pill.
   useEffect(() => {
     if (state !== "complete" || !isVisible) return;
-    const id = setTimeout(() => setIsVisible(false), 5000);
+    const id = setTimeout(() => {
+      commands.showIdlePillIfEnabled();
+      setIsVisible(false);
+    }, 5000);
     return () => clearTimeout(id);
   }, [state, isVisible, session]);
 
@@ -323,6 +327,32 @@ const RecordingOverlay: React.FC = () => {
                 true,
               )
             : listeningRow(open, true)}
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Idle pill: persistent, click to dictate (sttts) ----
+  if (state === "idle") {
+    return (
+      <div
+        dir={direction}
+        className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
+      >
+        <div className="scard compact">
+          <button
+            className="sbase again-btn"
+            onClick={() => {
+              setIsVisible(false);
+              commands.toggleDictation();
+            }}
+          >
+            <span className="sbase-l">
+              <span className="sdot" />
+            </span>
+            {/* eslint-disable-next-line i18next/no-literal-string -- action verb */}
+            <span className="swork-label">Dictate</span>
+          </button>
         </div>
       </div>
     );

@@ -620,6 +620,11 @@ pub fn show_complete_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "complete");
 }
 
+/// Shows the small idle dictation pill (sttts: persistent, click to dictate)
+pub fn show_idle_pill(app_handle: &AppHandle) {
+    show_overlay_state(app_handle, "idle");
+}
+
 /// Shows the streaming (Live) overlay window
 pub fn show_streaming_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "streaming");

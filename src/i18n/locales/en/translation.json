@@ -251,6 +251,10 @@
           "push_to_talk": "Records while you hold the shortcut",
           "toggle": "Tap the shortcut to start recording, tap again to stop"
         }
+      },
+      "idlePill": {
+        "label": "Persistent dictation pill",
+        "description": "Keep a small Dictate button on screen while idle — click it to start without the keyboard"
       }
     },
     "models": {

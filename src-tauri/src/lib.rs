@@ -270,6 +270,11 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         tray::set_tray_visibility(app_handle, false);
     }
 
+    // sttts: persistent idle dictation pill
+    if settings.overlay_idle_pill {
+        overlay::show_idle_pill(app_handle);
+    }
+
     // Refresh tray menu when model state changes
     let app_handle_for_listener = app_handle.clone();
     app_handle.listen("model-state-changed", move |_| {
@@ -589,6 +594,9 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_favorite_languages_setting,
             shortcut::change_dictation_shortcut_setting,
             shortcut::change_vad_backend_setting,
+            shortcut::change_overlay_idle_pill_setting,
+            shortcut::show_idle_pill_if_enabled,
+            shortcut::hide_overlay,
             shortcut::change_auto_stop_silence_setting,
             shortcut::change_remote_transcription_api_key_setting,
             shortcut::get_remote_transcription_api_key,

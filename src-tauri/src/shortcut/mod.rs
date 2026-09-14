@@ -1412,6 +1412,37 @@ pub fn change_vad_backend_setting(
     Ok(())
 }
 
+/// sttts: hide the overlay window (idle-pill toggle off).
+#[tauri::command]
+#[specta::specta]
+pub fn hide_overlay(app: AppHandle) {
+    crate::overlay::hide_recording_overlay(&app);
+}
+
+/// sttts: called by the frontend when the post-dictation overlay dismisses.
+#[tauri::command]
+#[specta::specta]
+pub fn show_idle_pill_if_enabled(app: AppHandle) {
+    if settings::get_settings(&app).overlay_idle_pill {
+        crate::overlay::show_idle_pill(&app);
+    }
+}
+
+/// sttts: persistent idle dictation pill.
+#[tauri::command]
+#[specta::specta]
+pub fn change_overlay_idle_pill_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.overlay_idle_pill = enabled;
+    settings::write_settings(&app, settings);
+    if enabled {
+        crate::overlay::show_idle_pill(&app);
+    } else {
+        crate::overlay::hide_recording_overlay(&app);
+    }
+    Ok(())
+}
+
 /// sttts: silence auto-stop threshold (requires VAD).
 #[tauri::command]
 #[specta::specta]

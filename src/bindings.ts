@@ -501,6 +501,29 @@ async changeVadBackendSetting(backend: VadBackend) : Promise<Result<null, string
 }
 },
 /**
+ * sttts: persistent idle dictation pill.
+ */
+async changeOverlayIdlePillSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_overlay_idle_pill_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * sttts: called by the frontend when the post-dictation overlay dismisses.
+ */
+async showIdlePillIfEnabled() : Promise<void> {
+    await TAURI_INVOKE("show_idle_pill_if_enabled");
+},
+/**
+ * sttts: hide the overlay window (idle-pill toggle off).
+ */
+async hideOverlay() : Promise<void> {
+    await TAURI_INVOKE("hide_overlay");
+},
+/**
  * sttts: silence auto-stop threshold (requires VAD).
  */
 async changeAutoStopSilenceSetting(ms: number) : Promise<Result<null, string>> {
@@ -963,7 +986,12 @@ dictation_shortcut?: string;
  * Stop recording automatically after this much VAD silence following
  * speech (ms). 0 = off. Requires Voice Activity Detection.
  */
-auto_stop_silence_ms?: number; vad_backend?: VadBackend; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; paste_delay_after_ms?: number; 
+auto_stop_silence_ms?: number; vad_backend?: VadBackend; 
+/**
+ * sttts: keep a small dictation pill visible while idle, so a click can
+ * start a recording without the keyboard.
+ */
+overlay_idle_pill?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; paste_delay_after_ms?: number; 
 /**
  * Debug-gated ("beta") receipt-sequenced paste: restore the clipboard only
  * after the target app actually reads the transcript, instead of after a
