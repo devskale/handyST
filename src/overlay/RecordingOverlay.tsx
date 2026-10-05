@@ -10,6 +10,7 @@ import type {
   StreamWorkKind,
 } from "@/bindings";
 import i18n, { syncLanguageFromSettings } from "@/i18n";
+import { DEFAULT_FAVORITE_LANGUAGES } from "@/lib/constants/languages";
 import { getLanguageDirection } from "@/lib/utils/rtl";
 
 type OverlayState =
@@ -51,11 +52,8 @@ const RecordingOverlay: React.FC = () => {
   const [overflowing, setOverflowing] = useState(false);
   // Language quick-switcher: favorites + the current selection. Applies to
   // the next utterance (the stream is opened with it as the language hint).
-  const [favLanguages, setFavLanguages] = useState<string[]>([
-    "auto",
-    "de",
-    "en",
-  ]);
+  const [favLanguages, setFavLanguages] =
+    useState<string[]>(DEFAULT_FAVORITE_LANGUAGES);
   const [curLanguage, setCurLanguage] = useState("auto");
 
   const switchLanguage = (lang: string) => {
@@ -311,8 +309,10 @@ const RecordingOverlay: React.FC = () => {
                 onClick={() => switchLanguage(lang)}
                 title={
                   lang === "auto"
-                    ? "Automatic language detection"
-                    : `Force ${lang.toUpperCase()} (next recording)`
+                    ? t("overlay.languageAutoTooltip")
+                    : t("overlay.languageForceTooltip", {
+                        lang: lang.toUpperCase(),
+                      })
                 }
               >
                 {lang === "auto" ? "AUTO" : lang.toUpperCase()}

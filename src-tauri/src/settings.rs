@@ -130,20 +130,6 @@ pub enum OverlayStyle {
     Live,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum ModelUnloadTimeout {
-    Never,
-    Immediately,
-    Min2,
-    #[default]
-    Min5,
-    Min10,
-    Min15,
-    Hour1,
-    Sec15, // Debug mode only
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum PasteMethod {
@@ -217,30 +203,6 @@ impl Default for PasteMethod {
         return PasteMethod::Direct;
         #[cfg(not(target_os = "linux"))]
         return PasteMethod::CtrlV;
-    }
-}
-
-impl ModelUnloadTimeout {
-    pub fn to_minutes(self) -> Option<u64> {
-        match self {
-            ModelUnloadTimeout::Never => None,
-            ModelUnloadTimeout::Immediately => Some(0), // Special case for immediate unloading
-            ModelUnloadTimeout::Min2 => Some(2),
-            ModelUnloadTimeout::Min5 => Some(5),
-            ModelUnloadTimeout::Min10 => Some(10),
-            ModelUnloadTimeout::Min15 => Some(15),
-            ModelUnloadTimeout::Hour1 => Some(60),
-            ModelUnloadTimeout::Sec15 => Some(0), // Special case for debug - handled separately
-        }
-    }
-
-    pub fn to_seconds(self) -> Option<u64> {
-        match self {
-            ModelUnloadTimeout::Never => None,
-            ModelUnloadTimeout::Immediately => Some(0), // Special case for immediate unloading
-            ModelUnloadTimeout::Sec15 => Some(15),
-            _ => self.to_minutes().map(|m| m * 60),
-        }
     }
 }
 
@@ -431,8 +393,6 @@ pub struct AppSettings {
     pub clamshell_microphone: Option<String>,
     #[serde(default)]
     pub selected_output_device: Option<String>,
-    #[serde(default = "default_translate_to_english")]
-    pub translate_to_english: bool,
     #[serde(default = "default_selected_language")]
     pub selected_language: String,
     #[serde(default = "default_overlay_position")]
@@ -443,8 +403,6 @@ pub struct AppSettings {
     pub log_level: LogLevel,
     #[serde(default)]
     pub custom_words: Vec<String>,
-    #[serde(default)]
-    pub model_unload_timeout: ModelUnloadTimeout,
     #[serde(default = "default_word_correction_threshold")]
     pub word_correction_threshold: f64,
     #[serde(default = "default_history_limit")]
@@ -496,7 +454,8 @@ pub struct AppSettings {
     #[serde(default = "default_favorite_languages")]
     pub favorite_languages: Vec<String>,
     /// macOS-dictation-style trigger: "none" | "mic_key" | "ctrl_double" |
-    /// "cmd_left_double" | "cmd_right_double" | "globe_double".
+    /// "cmd_left_double" | "cmd_right_double" | "opt_left_double" |
+    /// "opt_right_double" | "globe_double".
     #[serde(default)]
     pub dictation_shortcut: String,
     /// Stop recording automatically after this much VAD silence following
@@ -582,10 +541,6 @@ fn default_overlay_idle_pill() -> bool {
 }
 
 fn default_always_on_microphone() -> bool {
-    false
-}
-
-fn default_translate_to_english() -> bool {
     false
 }
 
@@ -694,7 +649,7 @@ fn default_remote_transcription_enabled() -> bool {
     true
 }
 fn default_remote_transcription_base_url() -> String {
-    "http://dgxp:3001".to_string()
+    "http://localhost:3001".to_string()
 }
 fn default_remote_transcription_model() -> String {
     "nemotron-3.5-asr-streaming-0.6b".to_string()
@@ -986,13 +941,11 @@ pub fn get_default_settings() -> AppSettings {
         selected_channel: None,
         clamshell_microphone: None,
         selected_output_device: None,
-        translate_to_english: false,
         selected_language: "auto".to_string(),
         overlay_position: default_overlay_position(),
         debug_mode: false,
         log_level: default_log_level(),
         custom_words: Vec::new(),
-        model_unload_timeout: ModelUnloadTimeout::default(),
         word_correction_threshold: default_word_correction_threshold(),
         history_limit: default_history_limit(),
         recording_retention_period: default_recording_retention_period(),
@@ -1136,11 +1089,7 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
 pub const REMOTE_API_KEY_SERVICE: &str = "sttts";
 pub const REMOTE_API_KEY_ACCOUNT: &str = "remote_transcription_api_key";
 
-pub fn load_remote_transcription_api_key_pub() -> String {
-    load_remote_transcription_api_key()
-}
-
-fn load_remote_transcription_api_key() -> String {
+pub fn load_remote_transcription_api_key() -> String {
     keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT)
         .and_then(|entry| entry.get_password())
         .unwrap_or_default()
@@ -1437,7 +1386,6 @@ mod tests {
             "debug_mode": false,
             "log_level": 2,
             "custom_words": ["Handy", "cjpais"],
-            "model_unload_timeout": "min5",
             "word_correction_threshold": 0.18,
             "history_limit": 5,
             "recording_retention_period": "preserve_limit",

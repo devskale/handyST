@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { SettingContainer } from "../../ui";
 import { Input } from "../../ui/Input";
 import { useSettings } from "../../../hooks/useSettings";
+import { DEFAULT_FAVORITE_LANGUAGES } from "../../../lib/constants/languages";
 
 /**
  * Which languages appear as chips in the recording overlay's quick switcher.
@@ -14,7 +15,7 @@ export const FavoriteLanguagesInput: React.FC<{
 }> = ({ descriptionMode = "tooltip", grouped = false }) => {
   const { t } = useTranslation();
   const { getSetting, updateSetting, isUpdating } = useSettings();
-  const favorites = (getSetting("favorite_languages") ?? ["auto", "de", "en"]).join(", ");
+  const favorites = (getSetting("favorite_languages") ?? DEFAULT_FAVORITE_LANGUAGES).join(", ");
   const [draft, setDraft] = React.useState(favorites);
   React.useEffect(() => setDraft(favorites), [favorites]);
 

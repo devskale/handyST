@@ -52,7 +52,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
   // Every locale the remote model family covers is offered; the endpoint
   // normalizes codes (de, de-DE, … all pin).
-  const availableLanguages = useMemo(() => SELECTABLE_LANGUAGES, []);
+  const availableLanguages = SELECTABLE_LANGUAGES;
 
   const filteredLanguages = useMemo(
     () =>

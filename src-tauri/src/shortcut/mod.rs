@@ -688,15 +688,6 @@ pub fn apply_window_theme(app: &AppHandle, theme: Theme) {
 
 #[tauri::command]
 #[specta::specta]
-pub fn change_translate_to_english_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
-    settings.translate_to_english = enabled;
-    settings::write_settings(&app, settings);
-    Ok(())
-}
-
-#[tauri::command]
-#[specta::specta]
 pub fn change_selected_language_setting(app: AppHandle, language: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.selected_language = language;
@@ -1442,7 +1433,7 @@ pub fn change_remote_transcription_api_key_setting(
 #[tauri::command]
 #[specta::specta]
 pub fn get_remote_transcription_api_key() -> Result<String, String> {
-    Ok(settings::load_remote_transcription_api_key_pub())
+    Ok(settings::load_remote_transcription_api_key())
 }
 
 /// sttts: languages shown in the overlay quick switcher.

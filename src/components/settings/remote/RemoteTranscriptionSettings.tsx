@@ -71,7 +71,7 @@ export const RemoteTranscriptionSettings: React.FC = () => {
                 event.target.value,
               )
             }
-            placeholder="http://dgxp:3001"
+            placeholder="http://localhost:3001"
             variant="compact"
             className="flex-1 min-w-[240px]"
           />
@@ -104,7 +104,7 @@ export const RemoteTranscriptionSettings: React.FC = () => {
           <Input
             type="password"
             value={apiKey}
-            onChange={(event) => saveApiKey(event.target.value)}
+            onBlur={(event) => saveApiKey(event.target.value)}
             placeholder="sk-..."
             variant="compact"
             className="flex-1 min-w-[240px]"

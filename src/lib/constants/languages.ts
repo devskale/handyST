@@ -168,3 +168,7 @@ export const getUniqueCapabilityLanguages = (
 export const getLanguageLabel = (languageCode: string): string | undefined =>
   LANGUAGE_LABELS.get(languageCode) ??
   LANGUAGE_LABELS.get(recognitionLanguage(languageCode));
+
+// Default quick-switch favorites before the user configures their own
+// (mirrors default_favorite_languages in src-tauri/src/settings.rs).
+export const DEFAULT_FAVORITE_LANGUAGES = ["auto", "de", "en"];

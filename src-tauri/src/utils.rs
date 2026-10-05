@@ -194,3 +194,15 @@ mod tests {
         std::env::remove_var("HANDY_TEST_FLAG_FALSY");
     }
 }
+
+/// Quantize f32 samples ([-1, 1]) to little-endian PCM16 bytes, the wire
+/// format shared by the remote streaming frames and the batch WAV builder.
+pub fn f32_to_pcm16_bytes(samples: &[f32]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(samples.len() * 2);
+    for &s in samples {
+        let v = s.clamp(-1.0, 1.0);
+        let q = if v < 0.0 { v * 32768.0 } else { v * 32767.0 } as i16;
+        out.extend_from_slice(&q.to_le_bytes());
+    }
+    out
+}

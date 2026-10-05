@@ -66,13 +66,7 @@ pub fn stream_url(base_url: &str) -> String {
 
 /// Convert an f32 mono frame to raw little-endian int16 bytes.
 pub fn f32_to_pcm16(samples: &[f32]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(samples.len() * 2);
-    for s in samples {
-        let v = s.clamp(-1.0, 1.0);
-        let q = if v < 0.0 { v * 32768.0 } else { v * 32767.0 } as i16;
-        bytes.extend_from_slice(&q.to_le_bytes());
-    }
-    bytes
+    crate::utils::f32_to_pcm16_bytes(samples)
 }
 
 /// Live handle to a streaming transcription session. Cheap to clone into the

@@ -48,11 +48,7 @@ pub fn f32_to_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
     // data chunk
     wav.extend_from_slice(b"data");
     wav.extend_from_slice(&data_len.to_le_bytes());
-    for s in samples {
-        let v = s.clamp(-1.0, 1.0);
-        let q = if v < 0.0 { v * 32768.0 } else { v * 32767.0 } as i16;
-        wav.extend_from_slice(&q.to_le_bytes());
-    }
+    wav.extend_from_slice(&crate::utils::f32_to_pcm16_bytes(samples));
     wav
 }
 
