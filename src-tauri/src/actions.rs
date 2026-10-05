@@ -4,18 +4,20 @@ use crate::audio_feedback::{play_feedback_sound, play_feedback_sound_blocking, S
 use crate::audio_toolkit::{is_microphone_access_denied, is_no_input_device_error, VadPolicy};
 use crate::managers::audio::AudioRecordingManager;
 use crate::managers::history::HistoryManager;
+use crate::chinese_script::{convert_chinese_script, ChineseVariety};
 use crate::managers::transcription::{language_hint, StreamWorkKind, TranscriptionManager};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use crate::settings::{get_settings, AppSettings, OverlayStyle, APPLE_INTELLIGENCE_PROVIDER_ID};
+use crate::settings::{
+    get_settings, AppSettings, ChineseScript, OverlayStyle, APPLE_INTELLIGENCE_PROVIDER_ID,
+};
 use crate::shortcut;
 use crate::tray::{change_tray_icon, TrayIconState};
 use crate::utils::{
     self, show_processing_overlay, show_recording_overlay, show_transcribing_overlay,
 };
 use crate::TranscriptionCoordinator;
-use ferrous_opencc::{config::BuiltinConfig, OpenCC};
 use log::{debug, error, warn};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -350,58 +352,43 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
     }
 }
 
-async fn maybe_convert_chinese_variant(
-    effective_language: &str,
-    transcription: &str,
-) -> Option<String> {
-    // Gate on the language the model actually transcribed in (the effective
-    // language), not the persisted intent. A leftover zh-Hans/zh-Hant intent
-    // from a previously selected model must not run OpenCC S2T/T2S over output a
-    // non-Chinese model produced — that would silently rewrite any shared CJK
-    // characters (e.g. Japanese kanji) in the result.
-    let is_simplified = effective_language == "zh-Hans";
-    let is_traditional = effective_language == "zh-Hant";
-
-    if !is_simplified && !is_traditional {
-        debug!("effective language is not Simplified or Traditional Chinese; skipping conversion");
-        return None;
-    }
-
-    debug!(
-        "Starting Chinese variant conversion using OpenCC for language: {}",
-        effective_language
-    );
-
-    // Use OpenCC to convert based on selected language
-    let config = if is_simplified {
-        // Convert Traditional Chinese to Simplified Chinese
-        BuiltinConfig::Tw2sp
-    } else {
-        // Convert Simplified Chinese to Traditional Chinese
-        BuiltinConfig::S2tw
-    };
-
-    match OpenCC::from_config(config) {
-        Ok(converter) => {
-            let converted = converter.convert(transcription);
-            debug!(
-                "OpenCC translation completed. Input length: {}, Output length: {}",
-                transcription.len(),
-                converted.len()
-            );
-            Some(converted)
-        }
-        Err(e) => {
-            error!("Failed to initialize OpenCC converter: {}. Falling back to original transcription.", e);
-            None
-        }
-    }
-}
-
 pub(crate) struct ProcessedTranscription {
     pub final_text: String,
     pub post_processed_text: Option<String>,
     pub post_process_prompt: Option<String>,
+}
+
+/// Rewrite Chinese output into the configured script. Gated on the effective
+/// language so a non-Chinese transcription is never rewritten (shared CJK
+/// characters, e.g. Japanese kanji, would silently change). Legacy zh-Hans /
+/// zh-Hant intents (settings written before the chinese_script migration)
+/// keep their old meaning; plain zh/yue follow the ChineseScript setting.
+fn maybe_convert_chinese_variant(
+    settings: &AppSettings,
+    effective_language: &str,
+    transcription: &str,
+) -> Option<String> {
+    let script = match effective_language {
+        "zh-Hans" | "zh-CN" => ChineseScript::Simplified,
+        "zh-Hant" | "zh-TW" | "zh-HK" => ChineseScript::Traditional,
+        _ => settings.chinese_script,
+    };
+    if script == ChineseScript::AsTranscribed {
+        debug!("no Chinese script conversion configured; skipping conversion");
+        return None;
+    }
+    let variety = match ChineseVariety::from_language(effective_language) {
+        Some(variety) => variety,
+        None => {
+            debug!("effective language is not Chinese; skipping conversion");
+            return None;
+        }
+    };
+    debug!(
+        "Converting Chinese output to {:?} for language {}",
+        script, effective_language
+    );
+    Some(convert_chinese_script(transcription, variety, script))
 }
 
 /// The language the transcription ran in: with remote inference there is no
@@ -422,12 +409,13 @@ pub(crate) async fn process_transcription_output(
     let mut post_processed_text: Option<String> = None;
     let mut post_process_prompt: Option<String> = None;
 
-    // Resolve the language the transcription actually ran in (the persisted
-    // intent coerced against the loaded model's capabilities) so OpenCC keys off
-    // the effective language rather than a possibly-stale intent.
+    // Resolve the language the transcription ran in (the persisted intent —
+    // with remote inference there is no local model registry to coerce
+    // against) so script conversion keys off the effective language rather
+    // than a possibly-stale intent.
     let effective_language = resolve_effective_language(app, &settings);
     if let Some(converted_text) =
-        maybe_convert_chinese_variant(&effective_language, transcription).await
+        maybe_convert_chinese_variant(&settings, &effective_language, &transcription)
     {
         final_text = converted_text;
     }
@@ -466,6 +454,13 @@ impl ShortcutAction for TranscribeAction {
         let rm = app.state::<Arc<AudioRecordingManager>>();
         let tm = Arc::clone(&app.state::<Arc<TranscriptionManager>>());
 
+        // Don't open the mic if nothing can transcribe the recording. Local
+        // inference is gone, so this means the remote path must be enabled
+        // (upstream #2161, adapted to the fork's architecture).
+        if !get_settings(app).remote_transcription_enabled {
+            warn!("Not starting recording: remote transcription is disabled");
+            return;
+        }
         // Pre-load the VAD model in the background, and open the remote
         // streaming session (the recorder's audio callback feeds it).
         let kickoff_started = Instant::now();
@@ -485,6 +480,9 @@ impl ShortcutAction for TranscribeAction {
             }
         }
         let kickoff_elapsed = kickoff_started.elapsed();
+
+        // Don't open the mic if nothing can transcribe the recording; the load
+        // kicked off above fails and reports why.
 
         let binding_id = binding_id.to_string();
         let tray_started = Instant::now();

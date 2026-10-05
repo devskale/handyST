@@ -20,6 +20,8 @@ import { KeyboardImplementationSelector } from "../debug/KeyboardImplementationS
 import { VoiceActivityDetection } from "../VoiceActivityDetection";
 import { LazyStreamClose } from "../LazyStreamClose";
 import { FillerWordRemoval } from "../FillerWordRemoval";
+import { ChineseScriptSetting } from "../ChineseScript";
+import { VadBackendSelector } from "../VadBackendSelector";
 import { RecordingBuffer } from "../RecordingBuffer";
 import { AutoStopSilence } from "../AutoStopSilence";
 
@@ -48,6 +50,7 @@ export const AdvancedSettings: React.FC = () => {
       <SettingsGroup title={t("settings.advanced.groups.transcription")}>
         <VoiceActivityDetection descriptionMode="tooltip" grouped={true} />
         <FillerWordRemoval descriptionMode="tooltip" grouped={true} />
+        <ChineseScriptSetting descriptionMode="tooltip" grouped={true} />
         <CustomWords descriptionMode="tooltip" grouped />
         <RecordingBuffer descriptionMode="tooltip" grouped={true} />
         <AutoStopSilence descriptionMode="tooltip" grouped={true} />

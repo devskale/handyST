@@ -4,6 +4,9 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   AppSettings as Settings,
   AudioDevice,
+  ChineseScript,
+  TranscribeAcceleratorSetting,
+  OrtAcceleratorSetting,
   ShortcutActivation,
 } from "@/bindings";
 import { commands } from "@/bindings";
@@ -169,6 +172,8 @@ const settingUpdaters: {
   vad_enabled: (value) => commands.changeVadEnabledSetting(value as boolean),
   filler_word_removal_enabled: (value) =>
     commands.changeFillerWordRemovalEnabledSetting(value as boolean),
+  chinese_script: (value) =>
+    commands.changeChineseScriptSetting(value as ChineseScript),
   show_tray_icon: (value) =>
     commands.changeShowTrayIconSetting(value as boolean),
   vad_backend: async (value) => {

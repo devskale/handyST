@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, type ReactNode } from "react";
 import { toast, Toaster } from "sonner";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
@@ -46,6 +46,23 @@ function App() {
     (state) => state.refreshOutputDevices,
   );
   const hasCompletedPostOnboardingInit = useRef(false);
+  const settingsScrollRef = useRef<HTMLDivElement>(null);
+  // sttts: onboarding was reduced to the accessibility step (no model step).
+  const isShowingOnboarding = onboardingStep === "accessibility";
+
+  // Classic scrollbars consume layout space. Reserve a matching gutter on the
+  // opposite edge while onboarding is visible so its content stays centered in
+  // the physical window. Overlay scrollbars ignore scrollbar-gutter.
+  useLayoutEffect(() => {
+    const attribute = "data-onboarding-active";
+    document.documentElement.toggleAttribute(attribute, isShowingOnboarding);
+    return () => document.documentElement.removeAttribute(attribute);
+  }, [isShowingOnboarding]);
+
+  // Reset the scroll position whenever the active section changes.
+  useLayoutEffect(() => {
+    settingsScrollRef.current?.scrollTo({ top: 0 });
+  }, [currentSection]);
 
   useEffect(() => {
     checkOnboardingStatus();
@@ -275,7 +292,7 @@ function App() {
           />
           {/* Scrollable content area */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto">
+            <div ref={settingsScrollRef} className="flex-1 overflow-y-auto">
               <div className="flex flex-col items-center p-4 gap-4">
                 <AccessibilityPermissions />
                 <SecureInputWarning />

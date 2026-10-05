@@ -163,6 +163,18 @@ pub enum ClipboardHandling {
     CopyToClipboard,
 }
 
+/// Script applied to Mandarin and Cantonese output. Other languages are never
+/// converted.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ChineseScript {
+    /// Keep whatever script the model produced.
+    #[default]
+    AsTranscribed,
+    Simplified,
+    Traditional,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AutoSubmitKey {
@@ -520,6 +532,10 @@ pub struct AppSettings {
     pub filler_word_removal_enabled: bool,
     #[serde(default)]
     pub custom_filler_words: Option<Vec<String>>,
+    /// Fresh installs default from the OS locale; existing stores are migrated
+    /// in `apply_settings_migrations`.
+    #[serde(default)]
+    pub chinese_script: ChineseScript,
     #[serde(default)]
     pub transcribe_accelerator: TranscribeAcceleratorSetting,
     #[serde(default)]
@@ -618,6 +634,12 @@ fn default_vad_enabled() -> bool {
 
 fn default_filler_word_removal_enabled() -> bool {
     true
+}
+
+fn default_chinese_script() -> ChineseScript {
+    tauri_plugin_os::locale()
+        .and_then(|locale| crate::chinese_script::chinese_script_for_locale(&locale))
+        .unwrap_or_default()
 }
 
 fn default_debug_mode() -> bool {
@@ -1000,6 +1022,7 @@ pub fn get_default_settings() -> AppSettings {
         external_script_path: None,
         filler_word_removal_enabled: default_filler_word_removal_enabled(),
         custom_filler_words: None,
+        chinese_script: default_chinese_script(),
         transcribe_accelerator: TranscribeAcceleratorSetting::default(),
         ort_accelerator: OrtAcceleratorSetting::default(),
         transcribe_gpu_device: default_transcribe_gpu_device(),
@@ -1207,6 +1230,37 @@ fn apply_settings_migrations(
         updated = true;
     }
 
+    // One-time shortcut activation migration (only while the new key is
+    // absent): the retired `push_to_talk` bool maps onto the two legacy modes so
+    // upgrading users keep exactly the behavior they had. Only fresh installs
+    // get the hold-or-toggle default.
+    if settings_value.get("shortcut_activation").is_none() {
+        if let Some(push_to_talk) = settings_value.get("push_to_talk").and_then(|v| v.as_bool()) {
+            settings.shortcut_activation = if push_to_talk {
+                ShortcutActivation::PushToTalk
+            } else {
+                ShortcutActivation::Toggle
+            };
+            updated = true;
+        }
+    }
+
+    // One-time Chinese script migration: the script used to be chosen through
+    // `zh-Hans`/`zh-Hant` language intents. Split those into the recognition
+    // language and the script setting; every other upgrading user keeps the
+    // unconverted output they had. Only fresh installs get the locale default.
+    if settings_value.get("chinese_script").is_none() {
+        settings.chinese_script = match settings.selected_language.as_str() {
+            "zh-Hans" => ChineseScript::Simplified,
+            "zh-Hant" => ChineseScript::Traditional,
+            _ => ChineseScript::AsTranscribed,
+        };
+        if settings.chinese_script != ChineseScript::AsTranscribed {
+            settings.selected_language = "zh".to_string();
+        }
+        updated = true;
+    }
+
     let stored_schema_version = settings_value
         .get("settings_schema_version")
         .and_then(|v| v.as_u64())
@@ -1267,12 +1321,12 @@ pub fn get_bindings(app: &AppHandle) -> HashMap<String, ShortcutBinding> {
     settings.bindings
 }
 
-pub fn get_stored_binding(app: &AppHandle, id: &str) -> ShortcutBinding {
-    let bindings = get_bindings(app);
-
-    let binding = bindings.get(id).unwrap().clone();
-
-    binding
+pub fn get_stored_binding(settings: &AppSettings, id: &str) -> Result<ShortcutBinding, String> {
+    settings
+        .bindings
+        .get(id)
+        .cloned()
+        .ok_or_else(|| format!("Binding with id '{}' not found", id))
 }
 
 pub fn get_history_limit(app: &AppHandle) -> usize {
@@ -1288,6 +1342,24 @@ pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stored_binding_returns_the_requested_binding() {
+        let settings = get_default_settings();
+
+        let result = get_stored_binding(&settings, "transcribe");
+
+        assert_eq!(result.unwrap().id, "transcribe");
+    }
+
+    #[test]
+    fn unknown_stored_binding_returns_an_error() {
+        let settings = get_default_settings();
+
+        let result = get_stored_binding(&settings, "unknown");
+
+        assert_eq!(result.unwrap_err(), "Binding with id 'unknown' not found");
+    }
 
     fn default_settings_json() -> serde_json::Value {
         serde_json::to_value(get_default_settings()).unwrap()
@@ -1316,7 +1388,7 @@ mod tests {
     /// `apply_settings_migrations` so old values keep loading, and only extend
     /// the fixture alongside that.
     #[test]
-    fn frozen_v0_9_store_parses_strictly_without_migration() {
+    fn frozen_v0_9_store_parses_strictly_then_migrates_device_index() {
         // Note "log_level": 2 — the legacy numeric format, kept deliberately.
         let stored: serde_json::Value = serde_json::from_str(
             r##"{
@@ -1407,7 +1479,9 @@ mod tests {
             "transcribe_gpu_device": 0,
             "extra_recording_buffer_ms": 0,
             "vad_enabled": true,
-            "overlay_style": "live"
+            "overlay_style": "live",
+            "chinese_script": "as_transcribed",
+            "vad_backend": "silero"
         }"##,
         )
         .expect("fixture is valid JSON");
@@ -1415,14 +1489,22 @@ mod tests {
         let mut settings: AppSettings = serde_json::from_value(stored.clone())
             .expect("a stored v0.9.0 settings object must keep parsing strictly");
 
-        assert_eq!(settings.selected_model, "whisper-large-v3-turbo");
         assert_eq!(settings.bindings["transcribe"].current_binding, "f13");
         assert_eq!(settings.log_level, LogLevel::Debug);
         assert_eq!(settings.sound_theme, SoundTheme::Pop);
         assert!(settings.filler_word_removal_enabled);
+        assert_eq!(settings.vad_backend, VadBackend::Silero);
 
-        // A current-format store must not be rewritten on every read.
-        assert!(!apply_settings_migrations(&mut settings, &stored));
+        // The fixture's schema version is behind the current one, so the
+        // one-time migrations run. sttts keeps the retired
+        // transcribe_gpu_device as a legacy i32 (no consumer); the fixture's
+        // 0 is already the reset default, so the accelerator stays untouched.
+        assert!(apply_settings_migrations(&mut settings, &stored));
+        assert_eq!(
+            settings.settings_schema_version,
+            CURRENT_SETTINGS_SCHEMA_VERSION
+        );
+        assert_eq!(settings.transcribe_gpu_device, 0);
     }
 
     #[test]
@@ -1580,6 +1662,77 @@ mod tests {
     }
 
     #[test]
+    fn chinese_script_migration_only_carries_over_legacy_intents() {
+        for (intent, language, script) in [
+            ("zh-Hans", "zh", ChineseScript::Simplified),
+            ("zh-Hant", "zh", ChineseScript::Traditional),
+            ("auto", "auto", ChineseScript::AsTranscribed),
+        ] {
+            let mut settings = get_default_settings();
+            settings.selected_language = intent.to_string();
+            settings.chinese_script = ChineseScript::Traditional;
+            let raw = serde_json::json!({ "selected_language": intent });
+
+            assert!(apply_settings_migrations(&mut settings, &raw));
+            assert_eq!(settings.selected_language, language);
+            assert_eq!(settings.chinese_script, script);
+        }
+    }
+
+    #[test]
+    fn shortcut_activation_migration_maps_push_to_talk_true() {
+        let mut settings = get_default_settings();
+        let raw = serde_json::json!({
+            "selected_model": "",
+            "push_to_talk": true
+        });
+
+        assert!(apply_settings_migrations(&mut settings, &raw));
+        assert_eq!(settings.shortcut_activation, ShortcutActivation::PushToTalk);
+    }
+
+    #[test]
+    fn shortcut_activation_migration_maps_push_to_talk_false() {
+        let mut settings = get_default_settings();
+        let raw = serde_json::json!({
+            "selected_model": "",
+            "push_to_talk": false
+        });
+
+        assert!(apply_settings_migrations(&mut settings, &raw));
+        assert_eq!(settings.shortcut_activation, ShortcutActivation::Toggle);
+    }
+
+    #[test]
+    fn shortcut_activation_migration_respects_explicit_new_key() {
+        let mut settings = get_default_settings();
+        settings.shortcut_activation = ShortcutActivation::HoldOrToggle;
+        let raw = serde_json::json!({
+            "selected_model": "",
+            "push_to_talk": true,
+            "shortcut_activation": "hold_or_toggle"
+        });
+
+        apply_settings_migrations(&mut settings, &raw);
+        assert_eq!(
+            settings.shortcut_activation,
+            ShortcutActivation::HoldOrToggle
+        );
+    }
+
+    #[test]
+    fn shortcut_activation_defaults_to_hold_or_toggle_without_legacy_key() {
+        let mut settings = get_default_settings();
+        let raw = serde_json::json!({ "selected_model": "" });
+
+        apply_settings_migrations(&mut settings, &raw);
+        assert_eq!(
+            settings.shortcut_activation,
+            ShortcutActivation::HoldOrToggle
+        );
+    }
+
+    #[test]
     fn gpu_device_migration_resets_legacy_positive_selection_to_auto() {
         let mut settings = get_default_settings();
         settings.transcribe_accelerator = TranscribeAcceleratorSetting::Gpu;
@@ -1616,6 +1769,7 @@ mod tests {
             "onboarding_completed": false,
             "whats_new_last_seen_version": default_whats_new_last_seen_version(),
             "overlay_style": "live",
+            "chinese_script": "as_transcribed",
             "transcribe_accelerator": "gpu",
             "transcribe_gpu_device": 2
         });
