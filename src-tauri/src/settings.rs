@@ -1098,77 +1098,39 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
     settings
 }
 
-/// Keychain coordinates for the remote transcription API key.
-pub const REMOTE_API_KEY_SERVICE: &str = "sttts";
-pub const REMOTE_API_KEY_ACCOUNT: &str = "remote_transcription_api_key";
-
-/// Rebuild-proof fallback storage for the remote API key. The keychain ACL
-/// ties an item to the binary that created it, so every re-signed build
-/// (including local dev rebuilds) silently lost access and the user had to
-/// re-enter the key. The fallback file lives in the app data dir next to the
-/// settings store with 0600 permissions; it survives reinstalls and rebuilds.
-fn remote_api_key_fallback_path(app: &AppHandle) -> std::path::PathBuf {
+/// Storage for the remote transcription API key: a 0600 file in the app data
+/// dir next to the settings store. The OS keychain was tried first, but its
+/// ACL ties items to the exact binary signature — every re-signed build
+/// (local dev rebuilds!) lost access, triggered macOS permission prompts and
+/// forced key re-entry. The file is user-readable only and survives
+/// reinstalls and rebuilds; the same trust level as settings_store.json,
+/// which already holds other credentials on this personal fork.
+fn remote_api_key_path(app: &AppHandle) -> std::path::PathBuf {
     crate::portable::store_path("remote_transcription_api_key.fallback")
 }
 
 pub fn load_remote_transcription_api_key(app: &AppHandle) -> String {
-    if let Ok(entry) = keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT) {
-        match entry.get_password() {
-            Ok(key) if !key.is_empty() => return key,
-            // Normal states: nothing stored yet, or the user cleared it.
-            Ok(_) => {}
-            Err(keyring::Error::NoEntry) => {}
-            Err(e) => warn!(
-                "sttts: keychain read for the remote API key failed ({e}) — using the local fallback"
-            ),
-        }
-    }
-    let path = remote_api_key_fallback_path(app);
-    std::fs::read_to_string(&path)
+    std::fs::read_to_string(remote_api_key_path(app))
         .map(|k| k.trim().to_string())
         .unwrap_or_default()
 }
 
-/// Store (or, with an empty key, delete) the remote transcription API key.
-/// Writes the rebuild-proof fallback file first and the OS keychain best
-/// effort: a keychain failure is logged but never loses the key, because the
-/// ACL of an existing item can deny access to re-signed builds.
+/// Store (or, with an empty key, delete) the remote transcription API key in
+/// the app data file. See `remote_api_key_path` for why this is not the OS
+/// keychain.
 pub fn store_remote_transcription_api_key(app: &AppHandle, api_key: &str) -> Result<(), String> {
-    let path = remote_api_key_fallback_path(app);
+    let path = remote_api_key_path(app);
     if api_key.is_empty() {
         let _ = std::fs::remove_file(&path);
-    } else {
-        std::fs::write(&path, api_key).map_err(|e| format!("fallback write failed: {e}"))?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
-        }
-    }
-
-    let entry = match keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT) {
-        Ok(entry) => entry,
-        Err(e) => {
-            warn!("sttts: keychain unavailable for the remote API key: {e}");
-            return Ok(());
-        }
-    };
-    if api_key.is_empty() {
-        // Absence of an entry is not an error (nothing stored yet).
-        let _ = entry.delete_credential();
         return Ok(());
     }
-    match entry.set_password(api_key) {
-        Ok(()) => Ok(()),
-        // Fall back to delete + re-create for backends that cannot update in place.
-        Err(_) => {
-            let _ = entry.delete_credential();
-            if let Err(e) = entry.set_password(api_key) {
-                warn!("sttts: keychain write for the remote API key failed: {e}");
-            }
-            Ok(())
-        }
+    std::fs::write(&path, api_key).map_err(|e| format!("key file write failed: {e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
     }
+    Ok(())
 }
 
 /// Rebuilds settings from a store value that failed to deserialize as a whole.
