@@ -1422,7 +1422,7 @@ pub fn change_remote_transcription_api_key_setting(
     app: AppHandle,
     api_key: String,
 ) -> Result<(), String> {
-    settings::store_remote_transcription_api_key(&api_key)?;
+    settings::store_remote_transcription_api_key(&app, &api_key)?;
     // Re-read so the in-memory value everywhere reflects the new key.
     let _ = settings::get_settings(&app);
     Ok(())
@@ -1432,8 +1432,8 @@ pub fn change_remote_transcription_api_key_setting(
 /// is a secret, so it is not part of the specta AppSettings type).
 #[tauri::command]
 #[specta::specta]
-pub fn get_remote_transcription_api_key() -> Result<String, String> {
-    Ok(settings::load_remote_transcription_api_key())
+pub fn get_remote_transcription_api_key(app: AppHandle) -> Result<String, String> {
+    Ok(settings::load_remote_transcription_api_key(&app))
 }
 
 /// sttts: per-component result of the remote transcription health check.
@@ -1467,7 +1467,7 @@ pub async fn check_remote_transcription(
         .remote_transcription_base_url
         .trim_end_matches('/')
         .to_string();
-    let api_key = settings::load_remote_transcription_api_key();
+    let api_key = settings::load_remote_transcription_api_key(&app);
     let mut components: Vec<RemoteCheckComponent> = Vec::new();
 
     let client = reqwest::Client::builder()

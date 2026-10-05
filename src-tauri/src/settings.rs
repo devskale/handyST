@@ -1080,7 +1080,7 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
     // sttts: the remote transcription API key lives in the OS keychain, never
     // in settings.json (the field is skip_serializing). Overlay it on every
     // read so consumers always see the current secret.
-    settings.remote_transcription_api_key = load_remote_transcription_api_key();
+    settings.remote_transcription_api_key = load_remote_transcription_api_key(app);
 
     settings
 }
@@ -1089,32 +1089,57 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
 pub const REMOTE_API_KEY_SERVICE: &str = "sttts";
 pub const REMOTE_API_KEY_ACCOUNT: &str = "remote_transcription_api_key";
 
-pub fn load_remote_transcription_api_key() -> String {
-    let Ok(entry) = keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT) else {
-        return String::new();
-    };
-    match entry.get_password() {
-        Ok(key) => key,
-        // Normal state before the user ever saved a key.
-        Err(keyring::Error::NoEntry) => String::new(),
-        // E.g. keychain ACL denial after the app was rebuilt/re-signed: the
-        // item exists but this binary may not read it. Surface the reason
-        // instead of silently handing out an empty key.
-        Err(e) => {
-            warn!(
-                "sttts: cannot read the remote API key from the keychain: {e}. \
-Re-enter the key in Settings → Remote Transcription to recreate it."
-            );
-            String::new()
-        }
-    }
+/// Rebuild-proof fallback storage for the remote API key. The keychain ACL
+/// ties an item to the binary that created it, so every re-signed build
+/// (including local dev rebuilds) silently lost access and the user had to
+/// re-enter the key. The fallback file lives in the app data dir next to the
+/// settings store with 0600 permissions; it survives reinstalls and rebuilds.
+fn remote_api_key_fallback_path(app: &AppHandle) -> std::path::PathBuf {
+    crate::portable::store_path("remote_transcription_api_key.fallback")
 }
 
-/// Store (or, with an empty key, delete) the remote transcription API key in
-/// the OS keychain.
-pub fn store_remote_transcription_api_key(api_key: &str) -> Result<(), String> {
-    let entry = keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT)
-        .map_err(|e| format!("keychain error: {e}"))?;
+pub fn load_remote_transcription_api_key(app: &AppHandle) -> String {
+    if let Ok(entry) = keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT) {
+        match entry.get_password() {
+            Ok(key) if !key.is_empty() => return key,
+            // Normal states: nothing stored yet, or the user cleared it.
+            Ok(_) => {}
+            Err(keyring::Error::NoEntry) => {}
+            Err(e) => warn!(
+                "sttts: keychain read for the remote API key failed ({e}) — using the local fallback"
+            ),
+        }
+    }
+    let path = remote_api_key_fallback_path(app);
+    std::fs::read_to_string(&path)
+        .map(|k| k.trim().to_string())
+        .unwrap_or_default()
+}
+
+/// Store (or, with an empty key, delete) the remote transcription API key.
+/// Writes the rebuild-proof fallback file first and the OS keychain best
+/// effort: a keychain failure is logged but never loses the key, because the
+/// ACL of an existing item can deny access to re-signed builds.
+pub fn store_remote_transcription_api_key(app: &AppHandle, api_key: &str) -> Result<(), String> {
+    let path = remote_api_key_fallback_path(app);
+    if api_key.is_empty() {
+        let _ = std::fs::remove_file(&path);
+    } else {
+        std::fs::write(&path, api_key).map_err(|e| format!("fallback write failed: {e}"))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+        }
+    }
+
+    let entry = match keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT) {
+        Ok(entry) => entry,
+        Err(e) => {
+            warn!("sttts: keychain unavailable for the remote API key: {e}");
+            return Ok(());
+        }
+    };
     if api_key.is_empty() {
         // Absence of an entry is not an error (nothing stored yet).
         let _ = entry.delete_credential();
@@ -1125,9 +1150,10 @@ pub fn store_remote_transcription_api_key(api_key: &str) -> Result<(), String> {
         // Fall back to delete + re-create for backends that cannot update in place.
         Err(_) => {
             let _ = entry.delete_credential();
-            entry
-                .set_password(api_key)
-                .map_err(|e| format!("keychain error: {e}"))
+            if let Err(e) = entry.set_password(api_key) {
+                warn!("sttts: keychain write for the remote API key failed: {e}");
+            }
+            Ok(())
         }
     }
 }
