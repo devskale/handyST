@@ -735,6 +735,10 @@ impl ShortcutAction for TranscribeAction {
                     let language_hint = language_hint(&get_settings(&ah));
                     debug!("sttts: transcription pipeline: finalizing stream");
                     let finalized = tm.finalize_stream();
+                    // Whether the complete final was already pushed into the
+                    // bubble; the batch fallback branches must do it below or
+                    // the card keeps showing the stale last partial.
+                    let mut stream_final_emitted = false;
                     let transcription_result = match finalized {
                         Ok(Some(text)) if !text.trim().is_empty() => {
                             debug!("sttts: transcription pipeline: post-processing stream final");
@@ -743,6 +747,7 @@ impl ShortcutAction for TranscribeAction {
                             // last syllables were never in the bubble. Show
                             // the complete final there before pasting.
                             tm.emit_stream_final(&processed);
+                            stream_final_emitted = true;
                             Ok(processed)
                         }
                         Ok(_) => {
@@ -832,6 +837,16 @@ impl ShortcutAction for TranscribeAction {
                                 utils::hide_recording_overlay(&ah);
                                 change_tray_icon(&ah, TrayIconState::Idle);
                                 return;
+                            }
+
+                            // sttts: the batch fallback paths (no stream final
+                            // in time, stream dropped, stream disabled) never
+                            // pushed the transcript into the bubble, so the
+                            // card kept showing the stale last partial —
+                            // missing the final few words. Show the complete
+                            // text here like the streaming path does.
+                            if !stream_final_emitted && !processed.final_text.is_empty() {
+                                tm.emit_stream_final(&processed.final_text);
                             }
 
                             // Save to history if WAV was saved
