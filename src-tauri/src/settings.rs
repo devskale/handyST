@@ -1090,9 +1090,24 @@ pub const REMOTE_API_KEY_SERVICE: &str = "sttts";
 pub const REMOTE_API_KEY_ACCOUNT: &str = "remote_transcription_api_key";
 
 pub fn load_remote_transcription_api_key() -> String {
-    keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT)
-        .and_then(|entry| entry.get_password())
-        .unwrap_or_default()
+    let Ok(entry) = keyring::Entry::new(REMOTE_API_KEY_SERVICE, REMOTE_API_KEY_ACCOUNT) else {
+        return String::new();
+    };
+    match entry.get_password() {
+        Ok(key) => key,
+        // Normal state before the user ever saved a key.
+        Err(keyring::Error::NoEntry) => String::new(),
+        // E.g. keychain ACL denial after the app was rebuilt/re-signed: the
+        // item exists but this binary may not read it. Surface the reason
+        // instead of silently handing out an empty key.
+        Err(e) => {
+            warn!(
+                "sttts: cannot read the remote API key from the keychain: {e}. \
+Re-enter the key in Settings → Remote Transcription to recreate it."
+            );
+            String::new()
+        }
+    }
 }
 
 /// Store (or, with an empty key, delete) the remote transcription API key in
