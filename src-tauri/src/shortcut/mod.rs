@@ -23,8 +23,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::settings::APPLE_INTELLIGENCE_DEFAULT_MODEL_ID;
 use crate::settings::{
     self, get_settings, AutoSubmitKey, ChineseScript, ClipboardHandling, KeyboardImplementation,
-    LLMPrompt, OverlayPosition, OverlayStyle, PasteMethod, ShortcutActivation, ShortcutBinding,
-    SoundTheme, Theme, TypingTool, VadBackend, APPLE_INTELLIGENCE_PROVIDER_ID,
+    LLMPrompt, OverlayPosition, OverlayStyle, PasteMethod, ShortcutBinding, SoundTheme, Theme,
+    TypingTool, APPLE_INTELLIGENCE_PROVIDER_ID,
 };
 use crate::tray;
 

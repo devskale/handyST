@@ -87,32 +87,59 @@ pub struct TranscriptionManager {
 pub struct StreamRouter {
     session: Mutex<Option<Arc<RemoteStream>>>,
     /// True from `start_stream` until finalize/cancel. Checked first in the
-    /// audio callback so feeding stays cheap.
+    /// audio callback so feeding stays cheap. Set *before* the WS connect
+    /// completes so the mic can start immediately (staged state).
     open: AtomicBool,
+    /// Frames captured while the session was still connecting. Without this
+    /// buffer the connect latency swallows the first spoken syllables
+    /// (verschluckte Anfangssilben); they are replayed once the session is
+    /// up. Capped so a dead gateway can't grow it unbounded — the batch
+    /// fallback reads the full recording from the audio manager anyway.
+    preroll: Mutex<Vec<Vec<f32>>>,
 }
+
+/// Upper bound for the pre-roll buffer (2 s @ 16 kHz mono).
+const PREROLL_MAX_SAMPLES: usize = 16_000 * 2;
 
 impl StreamRouter {
     fn new() -> Self {
         Self {
             session: Mutex::new(None),
             open: AtomicBool::new(false),
+            preroll: Mutex::new(Vec::new()),
         }
     }
 
-    /// Forward a 16 kHz frame to the active remote stream. Cheap no-op when
-    /// no stream is open.
+    /// Forward a 16 kHz frame to the active remote stream. While the session
+    /// is still connecting, frames land in the pre-roll buffer.
     pub fn feed(&self, frame: &[f32]) {
         if !self.open.load(Ordering::Relaxed) {
             return;
         }
         if let Some(stream) = self.session.lock().unwrap().as_ref() {
             stream.feed(frame);
+            return;
         }
+        let mut preroll = self.preroll.lock().unwrap();
+        let mut total: usize = preroll.iter().map(|f| f.len()).sum();
+        while total + frame.len() > PREROLL_MAX_SAMPLES {
+            let Some(oldest) = preroll.first() else { break };
+            if oldest.len() > total + frame.len() - PREROLL_MAX_SAMPLES {
+                break;
+            }
+            total -= oldest.len();
+            preroll.remove(0);
+        }
+        preroll.push(frame.to_vec());
     }
 
     /// Whether a stream is pending or active.
     pub fn is_open(&self) -> bool {
         self.open.load(Ordering::Relaxed)
+    }
+
+    fn clear_preroll(&self) {
+        self.preroll.lock().unwrap().clear();
     }
 }
 
@@ -132,7 +159,13 @@ impl TranscriptionManager {
 
     /// Open a remote streaming session for the next recording. Partial
     /// transcripts are forwarded to the streaming overlay as they arrive.
-    pub fn start_stream(&self) -> Result<()> {
+    ///
+    /// The WS connect runs on a background thread so the hotkey handler can
+    /// start the microphone immediately; frames captured during the connect
+    /// are buffered in the router's pre-roll and replayed once the session is
+    /// up. Previously the `block_on(connect)` (up to the 3 s CONNECT_TIMEOUT)
+    /// delayed capture start and swallowed initial syllables.
+    pub fn start_stream(self: &Arc<Self>) -> Result<()> {
         if self.router.is_open() {
             warn!("sttts: start_stream while a stream is still open — replacing it");
             self.cancel_stream();
@@ -146,6 +179,10 @@ impl TranscriptionManager {
         }
         let cfg = remote_config(&settings);
 
+        // Staged open: the audio callback starts routing frames into the
+        // pre-roll now, before the session exists.
+        self.router.open.store(true, Ordering::Release);
+
         let app_handle = self.app_handle.clone();
         let on_partial = move |text: String| {
             let _ = StreamTextEvent {
@@ -155,16 +192,38 @@ impl TranscriptionManager {
             .emit(&app_handle);
         };
 
-        let stream = tauri::async_runtime::block_on(RemoteStream::connect(&cfg, on_partial))
-            .map_err(anyhow::Error::msg)?;
-
-        *self.router.session.lock().unwrap() = Some(Arc::new(stream));
-        self.router.open.store(true, Ordering::Release);
-        info!(
-            "sttts: remote stream started ({} → {})",
-            cfg.base_url,
-            crate::remote_stream::stream_url(&cfg.base_url)
-        );
+        let this = Arc::clone(self);
+        std::thread::spawn(move || {
+            let stream = match tauri::async_runtime::block_on(RemoteStream::connect(&cfg, on_partial))
+            {
+                Ok(stream) => Arc::new(stream),
+                Err(e) => {
+                    this.router.open.store(false, Ordering::Release);
+                    this.router.clear_preroll();
+                    warn!("sttts: remote stream failed to connect (batch fallback): {}", e);
+                    return;
+                }
+            };
+            *this.router.session.lock().unwrap() = Some(Arc::clone(&stream));
+            // Replay what was spoken while the connect was in flight.
+            let preroll: Vec<Vec<f32>> =
+                std::mem::take(&mut *this.router.preroll.lock().unwrap());
+            let drained: usize = preroll.iter().map(|f| f.len()).sum();
+            for frame in &preroll {
+                stream.feed(frame);
+            }
+            if drained > 0 {
+                info!(
+                    "sttts: replayed {:.0} ms of pre-roll audio into the stream",
+                    1000.0 * drained as f64 / 16_000.0
+                );
+            }
+            info!(
+                "sttts: remote stream started ({} → {})",
+                cfg.base_url,
+                crate::remote_stream::stream_url(&cfg.base_url)
+            );
+        });
         Ok(())
     }
 
@@ -180,13 +239,15 @@ impl TranscriptionManager {
         if !self.router.open.swap(false, Ordering::Release) {
             return Ok(None);
         }
-        let stream = self
-            .router
-            .session
-            .lock()
-            .unwrap()
-            .take()
-            .ok_or_else(|| anyhow::anyhow!("stream marked open but no session present"))?;
+        let stream = match self.router.session.lock().unwrap().take() {
+            Some(stream) => stream,
+            // Connect was still in flight when the user stopped: nothing was
+            // streamed, so the batch fallback must take the full recording.
+            None => {
+                self.router.clear_preroll();
+                return Ok(None);
+            }
+        };
         match stream.finalize() {
             Ok(text) => Ok(Some(text)),
             Err(e) => Err(anyhow::anyhow!("remote stream failed: {}", e)),
@@ -196,6 +257,7 @@ impl TranscriptionManager {
     /// Tear down the active stream without waiting for a final (cancel path).
     pub fn cancel_stream(&self) {
         self.router.open.store(false, Ordering::Release);
+        self.router.clear_preroll();
         if let Some(stream) = self.router.session.lock().unwrap().take() {
             stream.abort();
         }

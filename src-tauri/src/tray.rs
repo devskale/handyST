@@ -180,7 +180,7 @@ fn version_label() -> String {
 }
 
 /// sttts compat for upstream's single-writer tray callers.
-pub fn set_tray_state(app: &AppHandle, state: TrayIconState) {
+pub fn set_tray_state(app: &AppHandle, _state: TrayIconState) {
     update_tray_menu(app, None);
 }
 
