@@ -709,7 +709,9 @@ pub fn change_overlay_position_setting(app: AppHandle, position: String) -> Resu
             OverlayPosition::Bottom
         }
     };
+    // sttts: switching Top/Bottom back to a preset clears any dragged pill position.
     settings.overlay_position = parsed;
+    settings.overlay_pill_pos = None;
     settings::write_settings(&app, settings);
 
     // Whether the overlay shows at all is owned by overlay_style now; position
@@ -1434,6 +1436,17 @@ pub fn change_remote_transcription_api_key_setting(
 #[specta::specta]
 pub fn get_remote_transcription_api_key(app: AppHandle) -> Result<String, String> {
     Ok(settings::load_remote_transcription_api_key(&app))
+}
+
+/// sttts: persist the user-dragged pill position (logical coordinates) from
+/// the overlay window's drag handler.
+#[tauri::command]
+#[specta::specta]
+pub fn set_overlay_pill_position(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.overlay_pill_pos = Some(settings::PillPosition { x, y });
+    settings::write_settings(&app, settings);
+    Ok(())
 }
 
 /// sttts: per-component result of the remote transcription health check.

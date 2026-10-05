@@ -106,6 +106,10 @@
 .ov-stage {
   position: fixed;
   inset: 0;
+  cursor: grab; /* sttts: pill is draggable; click-to-dictate still works */
+}
+.ov-stage:active {
+  cursor: grabbing;
   display: flex;
   justify-content: center; /* horizontal centering, kept for both forms */
   align-items: flex-end; /* bottom placement: flush to the bottom edge */

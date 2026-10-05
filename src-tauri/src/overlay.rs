@@ -544,7 +544,13 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
             let pos_started = std::time::Instant::now();
             #[cfg(not(target_os = "windows"))]
             let set_pos_elapsed =
-                if let Some((x, y)) = calculate_overlay_position(app_handle, width, height) {
+                // sttts: a user-dragged pill position wins over the centered
+                // top/bottom placement.
+                if let Some((x, y)) = settings::get_settings(app_handle)
+                    .overlay_pill_pos
+                    .map(|p| (p.x, p.y))
+                    .or_else(|| calculate_overlay_position(app_handle, width, height))
+                {
                     let set_pos_started = std::time::Instant::now();
                     let _ = overlay_window
                         .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
@@ -679,7 +685,13 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
             // overlay is in compact or streaming layout.
             let (width, height) = current_overlay_logical_size(&overlay_window)
                 .unwrap_or((OVERLAY_WIDTH, OVERLAY_HEIGHT));
-            if let Some((x, y)) = calculate_overlay_position(app_handle, width, height) {
+            // sttts: a user-dragged pill position wins over the centered
+            // top/bottom placement.
+            let saved = settings::get_settings(app_handle).overlay_pill_pos;
+            if let Some((x, y)) = saved
+                .map(|p| (p.x, p.y))
+                .or_else(|| calculate_overlay_position(app_handle, width, height))
+            {
                 let _ = overlay_window
                     .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
             }

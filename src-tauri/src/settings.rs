@@ -458,6 +458,10 @@ pub struct AppSettings {
     /// "opt_right_double" | "globe_double".
     #[serde(default)]
     pub dictation_shortcut: String,
+    /// sttts: saved pill position once the user dragged the pill; overrides
+    /// the centered top/bottom placement.
+    #[serde(default)]
+    pub overlay_pill_pos: Option<PillPosition>,
     /// Stop recording automatically after this much VAD silence following
     /// speech (ms). 0 = off. Requires Voice Activity Detection.
     #[serde(default)]
@@ -868,6 +872,14 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
 
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
+/// sttts: user-dragged position of the overlay/pill window, in logical
+/// screen coordinates. `None` = default centered top/bottom placement.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+pub struct PillPosition {
+    pub x: f64,
+    pub y: f64,
+}
+
 pub fn get_default_settings() -> AppSettings {
     #[cfg(target_os = "windows")]
     let default_shortcut = "ctrl+space";
@@ -988,6 +1000,7 @@ pub fn get_default_settings() -> AppSettings {
         remote_transcription_model: default_remote_transcription_model(),
         favorite_languages: default_favorite_languages(),
         dictation_shortcut: "none".to_string(),
+        overlay_pill_pos: None,
         auto_stop_silence_ms: 0,
         vad_backend: VadBackend::default(),
         overlay_idle_pill: default_overlay_idle_pill(),
