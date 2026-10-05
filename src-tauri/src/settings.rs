@@ -1106,7 +1106,12 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
 /// reinstalls and rebuilds; the same trust level as settings_store.json,
 /// which already holds other credentials on this personal fork.
 fn remote_api_key_path(app: &AppHandle) -> std::path::PathBuf {
-    crate::portable::store_path("remote_transcription_api_key.fallback")
+    // Must be an absolute, portable-aware path: a relative store_path would
+    // resolve against the process CWD ("/" for a Finder-launched GUI app),
+    // a GUI app and breaks the read/writes depending on how the app started.
+    crate::portable::app_data_dir(app)
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("remote_transcription_api_key.fallback")
 }
 
 pub fn load_remote_transcription_api_key(app: &AppHandle) -> String {
