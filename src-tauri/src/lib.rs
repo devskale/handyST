@@ -600,6 +600,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::hide_overlay,
             shortcut::change_auto_stop_silence_setting,
             shortcut::change_remote_transcription_api_key_setting,
+            shortcut::check_remote_transcription,
             shortcut::get_remote_transcription_api_key,
             shortcut::handy_keys::start_handy_keys_recording,
             shortcut::handy_keys::stop_handy_keys_recording,

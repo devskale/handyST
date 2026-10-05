@@ -546,6 +546,14 @@ async changeRemoteTranscriptionApiKeySetting(apiKey: string) : Promise<Result<nu
  * sttts: read the remote transcription API key from the keychain (the field
  * is a secret, so it is not part of the specta AppSettings type).
  */
+async checkRemoteTranscription() : Promise<Result<RemoteCheckResult, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("check_remote_transcription") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getRemoteTranscriptionApiKey() : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_remote_transcription_api_key") };
@@ -1217,3 +1225,6 @@ function __makeEvents__<T extends Record<string, any>>(
 		},
 	);
 }
+
+export type RemoteCheckComponent = { name: string; ok: boolean; detail: string }
+export type RemoteCheckResult = { ok: boolean; components: Array<RemoteCheckComponent> }

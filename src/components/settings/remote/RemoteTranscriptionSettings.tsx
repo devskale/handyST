@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { commands } from "@/bindings";
+import type { RemoteCheckResult } from "@/bindings";
 import { useSettings } from "../../../hooks/useSettings";
 import { SettingContainer, SettingsGroup } from "../../ui";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
@@ -21,6 +22,36 @@ export const RemoteTranscriptionSettings: React.FC = () => {
   const model = getSetting("remote_transcription_model") || "";
 
   const [apiKey, setApiKey] = useState("");
+  const [check, setCheck] = useState<RemoteCheckResult | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const runCheck = () => {
+    setChecking(true);
+    commands
+      .checkRemoteTranscription()
+      .then((result) => {
+        if (result.status === "ok") setCheck(result.data);
+        else
+          setCheck({
+            ok: false,
+            components: [
+              { name: "gateway", ok: false, detail: String(result.error) },
+            ],
+          });
+      })
+      .catch((e) =>
+        setCheck({
+          ok: false,
+          components: [{ name: "gateway", ok: false, detail: String(e) }],
+        }),
+      )
+      .finally(() => setChecking(false));
+  };
+
+  useEffect(() => {
+    runCheck();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
 
   useEffect(() => {
     commands
@@ -109,6 +140,49 @@ export const RemoteTranscriptionSettings: React.FC = () => {
             variant="compact"
             className="flex-1 min-w-[240px]"
           />
+        </SettingContainer>
+      </SettingsGroup>
+
+      <SettingsGroup title={t("settings.remoteTranscription.check.title")}>
+        <SettingContainer
+          title={t("settings.remoteTranscription.check.title")}
+          description={t("settings.remoteTranscription.check.description")}
+        >
+          <div className="flex flex-col gap-2 w-full">
+            {check?.components.map((c) => (
+              <div
+                key={c.name}
+                className="flex items-center justify-between gap-3 text-sm"
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className={
+                      c.ok
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
+                    }
+                  >
+                    {c.ok ? "✔" : "✘"}
+                  </span>
+                  {t(
+                    `settings.remoteTranscription.check.components.${c.name}`,
+                  )}
+                </span>
+                <span className="text-right text-xs text-neutral-500 dark:text-neutral-400 truncate max-w-[55%]">
+                  {c.detail}
+                </span>
+              </div>
+            ))}
+            <button
+              onClick={runCheck}
+              disabled={checking}
+              className="mt-1 self-start px-3 py-1.5 rounded-md text-sm bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-700 dark:hover:bg-neutral-600 disabled:opacity-50"
+            >
+              {checking
+                ? t("settings.remoteTranscription.check.running")
+                : t("settings.remoteTranscription.check.button")}
+            </button>
+          </div>
         </SettingContainer>
       </SettingsGroup>
     </div>

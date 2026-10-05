@@ -668,6 +668,20 @@
       "apiKey": {
         "label": "API Key",
         "description": "Bearer token, stored in the macOS Keychain."
+      },
+      "check": {
+        "title": "Status",
+        "description": "Checks the gateway and whether the transcription and speech models are up.",
+        "button": "Check again",
+        "running": "Checking…",
+        "summaryOk": "Everything is up.",
+        "summaryFail": "Not everything is reachable.",
+        "components": {
+          "gateway": "Gateway",
+          "models": "Models",
+          "stt": "Transcription (STT)",
+          "tts": "Speech (TTS)"
+        }
       }
     }
   },

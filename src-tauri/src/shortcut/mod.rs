@@ -14,7 +14,7 @@ pub mod handy_keys;
 pub mod tauri_impl;
 
 use log::{debug, error, info, warn};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager};
@@ -1434,6 +1434,182 @@ pub fn change_remote_transcription_api_key_setting(
 #[specta::specta]
 pub fn get_remote_transcription_api_key() -> Result<String, String> {
     Ok(settings::load_remote_transcription_api_key())
+}
+
+/// sttts: per-component result of the remote transcription health check.
+#[derive(Clone, Debug, Serialize, Deserialize, specta::Type)]
+pub struct RemoteCheckComponent {
+    /// "gateway" | "models" | "stt" | "tts"
+    pub name: String,
+    pub ok: bool,
+    /// HTTP status, model ids or the concrete error — for the settings UI.
+    pub detail: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, specta::Type)]
+pub struct RemoteCheckResult {
+    pub ok: bool,
+    pub components: Vec<RemoteCheckComponent>,
+}
+
+/// sttts: live health check for the remote transcription stack, run from the
+/// settings page. Verifies the gateway is reachable, lists the advertised
+/// models, and functionally probes STT (tiny silence WAV) and TTS (voices
+/// list) so "the models are there and running" is an observed fact, not an
+/// assumption.
+#[tauri::command]
+#[specta::specta]
+pub async fn check_remote_transcription(
+    app: AppHandle,
+) -> Result<RemoteCheckResult, String> {
+    let user_settings = settings::get_settings(&app);
+    let base_url = user_settings
+        .remote_transcription_base_url
+        .trim_end_matches('/')
+        .to_string();
+    let api_key = settings::load_remote_transcription_api_key();
+    let mut components: Vec<RemoteCheckComponent> = Vec::new();
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .map_err(|e| format!("http client: {e}"))?;
+    let auth = |req: reqwest::RequestBuilder| {
+        if api_key.is_empty() {
+            req
+        } else {
+            req.bearer_auth(&api_key)
+        }
+    };
+
+    // 1. Gateway reachable (/health is public).
+    let gw = client.get(format!("{base_url}/health")).send().await;
+    components.push(match gw {
+        Ok(r) => RemoteCheckComponent {
+            name: "gateway".into(),
+            ok: r.status().is_success(),
+            detail: format!("HTTP {}", r.status().as_u16()),
+        },
+        Err(e) => RemoteCheckComponent {
+            name: "gateway".into(),
+            ok: false,
+            detail: e.to_string(),
+        },
+    });
+
+    // 2. Advertised models (public endpoint, chat upstream).
+    match client.get(format!("{base_url}/v1/models")).send().await {
+        Ok(r) if r.status().is_success() => {
+            let ids: Vec<String> = r
+                .json::<serde_json::Value>()
+                .await
+                .ok()
+                .and_then(|v| {
+                    v.get("data").and_then(|d| d.as_array()).map(|arr| {
+                        arr.iter()
+                            .filter_map(|m| m.get("id").and_then(|i| i.as_str()))
+                            .map(str::to_string)
+                            .collect()
+                    })
+                })
+                .unwrap_or_default();
+            components.push(RemoteCheckComponent {
+                name: "models".into(),
+                ok: !ids.is_empty(),
+                detail: if ids.is_empty() {
+                    "keine Modelle gemeldet".into()
+                } else {
+                    ids.join(", ")
+                },
+            });
+        }
+        Ok(r) => components.push(RemoteCheckComponent {
+            name: "models".into(),
+            ok: false,
+            detail: format!("HTTP {}", r.status().as_u16()),
+        }),
+        Err(e) => components.push(RemoteCheckComponent {
+            name: "models".into(),
+            ok: false,
+            detail: e.to_string(),
+        }),
+    }
+
+    // 3. STT function test: 0.4 s of silence must round-trip with HTTP 200.
+    let wav = crate::remote_transcribe::f32_to_wav(&[0.0f32; 6_400], 16_000);
+    let form = reqwest::multipart::Form::new()
+        .text("model", user_settings.remote_transcription_model.clone())
+        .part(
+            "file",
+            reqwest::multipart::Part::bytes(wav)
+                .file_name("probe.wav")
+                .mime_str("audio/wav")
+                .map_err(|e| e.to_string())?,
+        );
+    let t0 = std::time::Instant::now();
+    match auth(client.post(format!("{base_url}/v1/audio/transcriptions")))
+        .multipart(form)
+        .send()
+        .await
+    {
+        Ok(r) => {
+            let status = r.status();
+            let detail = if status.is_success() {
+                format!("HTTP {} in {:.2}s", status.as_u16(), t0.elapsed().as_secs_f32())
+            } else {
+                let body = r.text().await.unwrap_or_default();
+                format!(
+                    "HTTP {}: {}",
+                    status.as_u16(),
+                    body.chars().take(160).collect::<String>()
+                )
+            };
+            components.push(RemoteCheckComponent {
+                name: "stt".into(),
+                ok: status.is_success(),
+                detail,
+            });
+        }
+        Err(e) => components.push(RemoteCheckComponent {
+            name: "stt".into(),
+            ok: false,
+            detail: e.to_string(),
+        }),
+    }
+
+    // 4. TTS: the voices listing proves the TTS upstream is alive without
+    // needing to know its model id (the speech endpoint 404s on mismatches).
+    match auth(client.get(format!("{base_url}/v1/audio/voices")))
+        .send()
+        .await
+    {
+        Ok(r) if r.status().is_success() => {
+            let n = r
+                .json::<serde_json::Value>()
+                .await
+                .ok()
+                .and_then(|v| v.get("voices").and_then(|x| x.as_array()).map(|a| a.len()))
+                .unwrap_or(0);
+            components.push(RemoteCheckComponent {
+                name: "tts".into(),
+                ok: true,
+                detail: format!("{n} Voices verfügbar"),
+            });
+        }
+        Ok(r) => components.push(RemoteCheckComponent {
+            name: "tts".into(),
+            ok: false,
+            detail: format!("HTTP {}", r.status().as_u16()),
+        }),
+        Err(e) => components.push(RemoteCheckComponent {
+            name: "tts".into(),
+            ok: false,
+            detail: e.to_string(),
+        }),
+    }
+
+    let ok = components.iter().all(|c| c.ok);
+    Ok(RemoteCheckResult { ok, components })
 }
 
 /// sttts: languages shown in the overlay quick switcher.
