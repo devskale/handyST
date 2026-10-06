@@ -839,17 +839,30 @@ pub fn run_pill_test(app_handle: &AppHandle) {
             on_main(Box::new(move || show_overlay_state(&h4, "streaming")));
             std::thread::sleep(std::time::Duration::from_millis(400));
             // Deterministic: the show path clamps the saved spot for the
-            // 400x170 panel; verify the clamp result math on the monitor
-            // containing the saved point (main display: 1470x956 logical).
+            // 400x170 panel. clamp_to_monitor needs the main thread on macOS
+            // (available_monitors off-main returned nothing and made this
+            // verdict a false negative), so compute it on_main.
+            let h6 = handle.clone();
+            let (tx2, rx2) = std::sync::mpsc::channel::<Option<(f64, f64)>>();
+            let _ = handle.run_on_main_thread(move || {
+                let _ = tx2.send(Some(clamp_to_monitor(&h6, tx, ty, 400.0, 170.0)));
+            });
+            let clamped = rx2
+                .recv_timeout(std::time::Duration::from_secs(3))
+                .ok()
+                .flatten();
             let saved = crate::settings::get_settings(&handle).overlay_pill_pos;
-            let (ex, ey) =
-                clamp_to_monitor(&handle, tx, ty, 400.0, 170.0);
-            let streaming_ok = saved.is_some()
-                && ex >= 0.0
-                && ex <= 1470.0 - 400.0
-                && ey >= 28.0
-                && ey <= 956.0 - 170.0
-                && visible();
+            let streaming_ok = match clamped {
+                Some((ex, ey)) => {
+                    saved.is_some()
+                        && ex >= 0.0
+                        && ex <= 1470.0 - 400.0
+                        && ey >= 28.0
+                        && ey <= 956.0 - 170.0
+                        && visible()
+                }
+                None => false,
+            };
             results.insert(
                 "streaming_clamped".into(),
                 serde_json::json!(streaming_ok),
