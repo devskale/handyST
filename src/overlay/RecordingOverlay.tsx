@@ -430,6 +430,9 @@ const PILL_CLICK_SUPPRESS_PX = 6;
 function usePillDrag() {
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    // Buttons (Dictate, language chips, cancel) must keep their normal click:
+    // a native drag session swallows the mouse-up, so the click never fires.
+    if ((e.target as HTMLElement).closest("button")) return;
     const startX = e.clientX;
     const startY = e.clientY;
     void commands.setOverlayPillDragging(true);

@@ -51,7 +51,7 @@ const OVERLAY_HEIGHT: f64 = 50.0;
 
 // Actual is 394x118, just a little extra
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
-const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
+const OVERLAY_STREAM_HEIGHT: f64 = 170.0;
 
 /// Overlay window size (logical) for a given UI state.
 fn overlay_dimensions(state: &str) -> (f64, f64) {
