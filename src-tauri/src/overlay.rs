@@ -715,22 +715,32 @@ pub fn run_pill_test(app_handle: &AppHandle) {
             let handle = handle2;
             let mut results = serde_json::Map::new();
 
-            // 1. show idle and read the position
+            // 1. show idle and read the position. All comparisons happen in
+            // logical points: outer_position is physical, so it is divided by
+            // the monitor's scale factor.
             show_overlay_state(&handle, "idle");
             std::thread::sleep(std::time::Duration::from_millis(300));
-            let pos1 = handle
-                .get_webview_window("recording_overlay")
-                .and_then(|w| w.outer_position().ok());
+            let win = handle.get_webview_window("recording_overlay");
+            let pos1 = win.as_ref().and_then(|w| w.outer_position().ok());
             results.insert("shown".into(), serde_json::json!(pos1.is_some()));
 
             // 2. move + persist through the drag-persist path
-            let target = pos1.map(|p| tauri::LogicalPosition {
-                x: p.x as f64 + 120.0,
-                y: (p.y as f64 - 60.0).max(40.0),
+            let target = win.as_ref().and_then(|w| {
+                w.scale_factor().ok().map(|scale| {
+                    let p = pos1.expect("position read above");
+                    tauri::LogicalPosition {
+                        x: p.x as f64 / scale + 120.0,
+                        y: ((p.y as f64 / scale) - 60.0).max(40.0),
+                    }
+                })
             });
-            if let (Some(win), Some(target)) =
-                (handle.get_webview_window("recording_overlay"), target)
-            {
+            if let (Some(win), Some(target)) = (win, target) {
+                let scale = win.scale_factor().unwrap_or(1.0);
+                let near = |p: &tauri::PhysicalPosition<i32>| {
+                    (p.x as f64 / scale - target.x).abs() < 2.0
+                        && (p.y as f64 / scale - target.y).abs() < 2.0
+                };
+
                 let _ = win.set_position(tauri::Position::Logical(target));
                 // Same persist path as the drag handler.
                 if let Err(e) = crate::shortcut::set_overlay_pill_position(
@@ -741,26 +751,16 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                     log::warn!("sttts: pill test persist failed: {e}");
                 }
                 std::thread::sleep(std::time::Duration::from_millis(300));
-                let pos2 = win.outer_position().ok();
-                let moved = pos2
-                    .map(|p| {
-                        (p.x as f64 - target.x).abs() < 2.0
-                            && (p.y as f64 - target.y).abs() < 2.0
-                    })
-                    .unwrap_or(false);
+                let moved = win.outer_position().ok().map(|p| near(&p)).unwrap_or(false);
                 results.insert("moved".into(), serde_json::json!(moved));
 
                 // 3. restore path: a fresh show must land at the saved spot
                 show_overlay_state(&handle, "idle");
                 std::thread::sleep(std::time::Duration::from_millis(300));
-                let pos3 = handle
-                    .get_webview_window("recording_overlay")
-                    .and_then(|w| w.outer_position().ok());
-                let restored = pos3
-                    .map(|p| {
-                        (p.x as f64 - target.x).abs() < 2.0
-                            && (p.y as f64 - target.y).abs() < 2.0
-                    })
+                let restored = win
+                    .outer_position()
+                    .ok()
+                    .map(|p| near(&p))
                     .unwrap_or(false);
                 results.insert("restored".into(), serde_json::json!(restored));
             } else {
