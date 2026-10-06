@@ -590,6 +590,21 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
                 log::error!("Failed to re-assert recording overlay position: {error}");
             }
 
+            // sttts: re-assert the position AFTER show(). On the macOS
+            // NSPanel the pre-show set_position is eaten by the panel's
+            // autoresize when the size changes in the same pass (verified:
+            // saved 1250 clamped to 1214, the card still rendered at ~1342,
+            // clipped off the right edge). The post-show move applies.
+            if !pill_dragging() {
+                if let Some((x, y)) = saved_pill_position(app_handle)
+                    .or_else(|| calculate_overlay_position(app_handle, width, height))
+                {
+                    let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
+                    let _ = overlay_window
+                        .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+                }
+            }
+
             log::debug!(
                 "overlay '{}': set_size={:?} pos_calc={:?} set_pos={:?} show={:?}",
                 state,
