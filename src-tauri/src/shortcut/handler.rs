@@ -67,6 +67,19 @@ pub fn handle_shortcut_event(
         return;
     }
 
+    // sttts: the synthetic "finish" binding (Enter) is only registered while
+    // a dictation is recording; pressing it runs the same stop path as
+    // releasing the hold key — the transcript finalizes and pastes.
+    if binding_id == "finish" {
+        let audio_manager = app.state::<Arc<AudioRecordingManager>>();
+        if audio_manager.is_recording() && is_pressed {
+            if let Some(action) = ACTION_MAP.get("transcribe") {
+                action.stop(app, "transcribe", hotkey_string);
+            }
+        }
+        return;
+    }
+
     // Remaining bindings (e.g. "test") use simple start/stop on press/release.
     if is_pressed {
         action.start(app, binding_id, hotkey_string);

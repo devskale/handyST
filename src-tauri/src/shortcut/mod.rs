@@ -115,15 +115,34 @@ fn reconcile_cancel_shortcut(app: &AppHandle) {
             return;
         };
 
+        // sttts: while recording, Enter finishes the dictation (same stop
+        // path as the transcribe binding's release). The synthetic binding
+        // only exists for the recording's lifetime, so Enter behaves
+        // normally in every other app outside a dictation.
+        let finish_binding = ShortcutBinding {
+            id: "finish".to_string(),
+            name: "Finish dictation".to_string(),
+            description: String::new(),
+            default_binding: String::new(),
+            current_binding: "enter".to_string(),
+        };
+
         if requested {
             match register_shortcut(app, cancel_binding) {
                 Ok(()) => *registered = true,
                 Err(e) => error!("Failed to register cancel shortcut: {}", e),
             }
+            match register_shortcut(app, finish_binding) {
+                Ok(()) => debug!("sttts: finish (Enter) shortcut registered"),
+                Err(e) => error!("sttts: failed to register finish shortcut: {}", e),
+            }
         } else {
             match unregister_shortcut(app, cancel_binding) {
                 Ok(()) => *registered = false,
                 Err(e) => error!("Failed to unregister cancel shortcut: {}", e),
+            }
+            if let Err(e) = unregister_shortcut(app, finish_binding) {
+                error!("sttts: failed to unregister finish shortcut: {}", e);
             }
         }
     }
