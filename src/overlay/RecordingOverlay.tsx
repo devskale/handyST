@@ -496,32 +496,46 @@ function usePillDrag() {
 
         // sttts: soft walls — the OS drag happily moves the window past the
         // screen edge, where it gets clipped pixel by pixel ("sie
-        // verschwindet langsam"). Clamp against the union of all displays so
-        // the whole window stays in visible space, on every poll.
+        // verschwindet langsam", worst in dead corners of the multi-monitor
+        // bounding box). Clamp per-monitor: onto the display the window's
+        // center is on (nearest when fully outside), with a menu-bar reserve
+        // at the top (the status panel draws behind it) and the 42px card
+        // inset at the left/right edges.
         const [scale, monitors] = await Promise.all([
           win.scaleFactor(),
           availableMonitors(),
         ]);
         if (monitors.length > 0) {
-          const minX = Math.min(...monitors.map((m) => m.position.x));
-          const minY = Math.min(...monitors.map((m) => m.position.y));
-          const maxX = Math.max(
-            ...monitors.map((m) => m.position.x + m.size.width),
-          );
-          const maxY = Math.max(
-            ...monitors.map((m) => m.position.y + m.size.height),
-          );
-          // Card-aware margins: the visible card sits 42px inside the window,
-          // so the window may overhang an edge by that much without the card
-          // clipping.
+          const cxw = pos.x + (256 * scale) / 2;
+          const cyw = pos.y + (64 * scale) / 2;
+          const centerDist = (m: {
+            position: { x: number; y: number };
+            size: { width: number; height: number };
+          }) => {
+            const mx2 = m.position.x + m.size.width;
+            const my2 = m.position.y + m.size.height;
+            const dx = Math.max(m.position.x - cxw, 0, cxw - mx2);
+            const dy = Math.max(m.position.y - cyw, 0, cyw - my2);
+            return dx * dx + dy * dy;
+          };
+          const mon = [...monitors].sort(
+            (a, b) => centerDist(a) - centerDist(b),
+          )[0];
           const inset = 42 * scale;
+          const topReserve = 28 * scale;
           const cx = Math.min(
-            Math.max(pos.x, minX - inset),
-            Math.max(minX - inset, maxX - (256 * scale - inset)),
+            Math.max(pos.x, mon.position.x - inset),
+            Math.max(
+              mon.position.x - inset,
+              mon.position.x + mon.size.width - (256 * scale - inset),
+            ),
           );
           const cy = Math.min(
-            Math.max(pos.y, minY),
-            Math.max(minY, maxY - 64 * scale),
+            Math.max(pos.y, mon.position.y + topReserve),
+            Math.max(
+              mon.position.y + topReserve,
+              mon.position.y + mon.size.height - 64 * scale,
+            ),
           );
           if (cx !== pos.x || cy !== pos.y) {
             pos = new PhysicalPosition(cx, cy);

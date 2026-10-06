@@ -770,6 +770,50 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                 let restored = saved_matches(&handle)
                     && win.is_visible().unwrap_or(false);
                 results.insert("restored".into(), serde_json::json!(restored));
+
+                // 4. edge probes (deep eval): d1 is 1470x956 logical. The
+                // dead-corner probe would hang the window off the right edge
+                // AND behind the menu bar — the guard must reject it. The
+                // valid probe is the top-right sweet spot — the guard must
+                // accept it, so the pill can LIVE top-right.
+                let probe_dead = (1400.0f64, 10.0f64);
+                let _ = win.set_position(tauri::Position::Logical(
+                    tauri::LogicalPosition {
+                        x: probe_dead.0,
+                        y: probe_dead.1,
+                    },
+                ));
+                let _ = crate::shortcut::set_overlay_pill_position(
+                    handle.clone(),
+                    probe_dead.0,
+                    probe_dead.1,
+                );
+                let dead_rejected = effective_saved_pill_position(&handle)
+                    .map(|p| {
+                        (p.0 - probe_dead.0).abs() > 1.0
+                            || (p.1 - probe_dead.1).abs() > 1.0
+                    });
+                results.insert(
+                    "probe_dead_corner_rejected".into(),
+                    serde_json::json!(dead_rejected.unwrap_or(true)),
+                );
+
+                let probe_valid = (1250.0f64, 40.0f64);
+                let _ = crate::shortcut::set_overlay_pill_position(
+                    handle.clone(),
+                    probe_valid.0,
+                    probe_valid.1,
+                );
+                let valid_accepted = effective_saved_pill_position(&handle)
+                    .map(|p| {
+                        (p.0 - probe_valid.0).abs() <= 1.0
+                            && (p.1 - probe_valid.1).abs() <= 1.0
+                    })
+                    .unwrap_or(false);
+                results.insert(
+                    "probe_top_right_saved".into(),
+                    serde_json::json!(valid_accepted),
+                );
             } else {
                 results.insert("moved".into(), serde_json::json!(false));
                 results.insert("restored".into(), serde_json::json!(false));
@@ -820,14 +864,21 @@ fn pill_pos_on_any_monitor(app_handle: &AppHandle, x: f64, y: f64) -> bool {
         let mw = m.size().width as f64 / scale;
         let mh = m.size().height as f64 / scale;
         // The visible CARD (172 px, centered with ~42 px inset in the 256 px
-        // window) must stay on-screen — the invisible window margin may
-        // overhang, otherwise dragging the card edge to the screen edge gets
-        // rejected and the pill teleports back on the next show.
+        // window) must stay on THIS monitor — the invisible window margin may
+        // overhang the edges. The top keeps a menu-bar reserve: the pill is
+        // a status-level panel and would otherwise slide behind it and
+        // "slowly disappear", especially top-right.
         x >= mx - 42.0
-            && y >= my
+            && y >= my + 28.0
             && x + OVERLAY_WIDTH - 42.0 <= mx + mw
             && y + OVERLAY_HEIGHT <= my + mh
     })
+}
+
+/// The saved position after the on-screen guard ran — what a show actually
+/// applies. Exposed for the --pill-test probes.
+pub fn effective_saved_pill_position(app_handle: &AppHandle) -> Option<(f64, f64)> {
+    saved_pill_position(app_handle)
 }
 
 fn saved_pill_position(app_handle: &AppHandle) -> Option<(f64, f64)> {
