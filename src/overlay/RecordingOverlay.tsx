@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { PhysicalPosition } from "@tauri-apps/api/dpi";
+import { availableMonitors } from "@tauri-apps/api/window";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./RecordingOverlay.css";
@@ -491,7 +492,39 @@ function usePillDrag() {
       tries++;
       try {
         const win = getCurrentWebviewWindow();
-        const pos = await win.position();
+        let pos = await win.position();
+
+        // sttts: soft walls — the OS drag happily moves the window past the
+        // screen edge, where it gets clipped pixel by pixel ("sie
+        // verschwindet langsam"). Clamp against the union of all displays so
+        // the whole window stays in visible space, on every poll.
+        const [scale, monitors] = await Promise.all([
+          win.scaleFactor(),
+          availableMonitors(),
+        ]);
+        if (monitors.length > 0) {
+          const minX = Math.min(...monitors.map((m) => m.position.x));
+          const minY = Math.min(...monitors.map((m) => m.position.y));
+          const maxX = Math.max(
+            ...monitors.map((m) => m.position.x + m.size.width),
+          );
+          const maxY = Math.max(
+            ...monitors.map((m) => m.position.y + m.size.height),
+          );
+          const cx = Math.min(
+            Math.max(pos.x, minX),
+            Math.max(minX, maxX - 256 * scale),
+          );
+          const cy = Math.min(
+            Math.max(pos.y, minY),
+            Math.max(minY, maxY - 64 * scale),
+          );
+          if (cx !== pos.x || cy !== pos.y) {
+            pos = new PhysicalPosition(cx, cy);
+            await win.setPosition(pos);
+          }
+        }
+
         const key = `${pos.x}:${pos.y}`;
         if (key === last) stable++;
         else stable = 0;
