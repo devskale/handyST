@@ -551,6 +551,11 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
                 } else if let Some((x, y)) = saved_pill_position(app_handle)
                     .or_else(|| calculate_overlay_position(app_handle, width, height))
                 {
+                    // State-aware clamp: the streaming panel is wider than
+                    // the idle card, so a saved idle position at the right
+                    // edge would clip it — pull the window fully on-screen
+                    // for THIS state's size.
+                    let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
                     let set_pos_started = std::time::Instant::now();
                     let _ = overlay_window
                         .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
@@ -691,6 +696,7 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
                 if let Some((x, y)) = saved_pill_position(app_handle)
                     .or_else(|| calculate_overlay_position(app_handle, width, height))
                 {
+                    let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
                     let _ = overlay_window
                         .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
                 }
@@ -710,131 +716,180 @@ pub fn run_pill_test(app_handle: &AppHandle) {
         // Give the overlay webview time to load its JS (the state re-request
         // runs on mount).
         std::thread::sleep(std::time::Duration::from_millis(1500));
-        let handle2 = handle.clone();
-        let _ = handle.run_on_main_thread(move || {
-            let handle = handle2;
-            let mut results = serde_json::Map::new();
 
-            // 1. show idle and read the position. All comparisons happen in
-            // logical points: outer_position is physical, so it is divided by
-            // the monitor's scale factor.
-            show_overlay_state(&handle, "idle");
-            std::thread::sleep(std::time::Duration::from_millis(300));
-            let win = handle.get_webview_window("recording_overlay");
-            let pos1 = win.as_ref().and_then(|w| w.outer_position().ok());
-            results.insert("shown".into(), serde_json::json!(pos1.is_some()));
-
-            // 2. move + persist through the drag-persist path
-            let target = win.as_ref().and_then(|w| {
-                w.scale_factor().ok().map(|scale| {
-                    let p = pos1.expect("position read above");
-                    tauri::LogicalPosition {
-                        x: p.x as f64 / scale + 120.0,
-                        y: ((p.y as f64 / scale) - 60.0).max(40.0),
-                    }
-                })
+        // Run a closure on the main thread and WAIT for it. Steps are
+        // separated so the main thread stays free between them — window
+        // frames apply and reads are honest (a blocked main thread made
+        // earlier verdicts lie).
+        let on_main = |job: Box<dyn FnOnce() + Send>| {
+            let (tx, rx) = std::sync::mpsc::channel::<()>();
+            let _ = handle.run_on_main_thread(move || {
+                job();
+                let _ = tx.send(());
             });
-            if let (Some(win), Some(target)) = (win, target) {
-                let _ = win.set_position(tauri::Position::Logical(target));
-                // Same persist path as the drag handler.
-                if let Err(e) = crate::shortcut::set_overlay_pill_position(
-                    handle.clone(),
-                    target.x,
-                    target.y,
-                ) {
-                    log::warn!("sttts: pill test persist failed: {e}");
-                }
-                std::thread::sleep(std::time::Duration::from_millis(300));
-
-                // outer_position() on the status-level NSPanel reports stale
-                // values (screenshot-verified: the window sits at the target
-                // while outer_position still returns the creation spot), so
-                // the verdict reads the persisted settings round-trip plus
-                // actual window visibility instead.
-                let saved_matches = |handle: &AppHandle| {
-                    crate::settings::get_settings(handle)
-                        .overlay_pill_pos
-                        .map(|p| {
-                            (p.x - target.x).abs() < 2.0
-                                && (p.y - target.y).abs() < 2.0
-                        })
-                        .unwrap_or(false)
-                };
-                let moved = saved_matches(&handle)
-                    && win.is_visible().unwrap_or(false);
-                results.insert("moved".into(), serde_json::json!(moved));
-
-                // 3. restore path: a fresh show must come from the saved spot
-                show_overlay_state(&handle, "idle");
-                std::thread::sleep(std::time::Duration::from_millis(300));
-                let restored = saved_matches(&handle)
-                    && win.is_visible().unwrap_or(false);
-                results.insert("restored".into(), serde_json::json!(restored));
-
-                // 4. edge probes (deep eval): d1 is 1470x956 logical. The
-                // dead-corner probe would hang the window off the right edge
-                // AND behind the menu bar — the guard must reject it. The
-                // valid probe is the top-right sweet spot — the guard must
-                // accept it, so the pill can LIVE top-right.
-                let probe_dead = (1400.0f64, 10.0f64);
-                let _ = win.set_position(tauri::Position::Logical(
-                    tauri::LogicalPosition {
-                        x: probe_dead.0,
-                        y: probe_dead.1,
-                    },
-                ));
-                let _ = crate::shortcut::set_overlay_pill_position(
-                    handle.clone(),
-                    probe_dead.0,
-                    probe_dead.1,
-                );
-                let dead_rejected = effective_saved_pill_position(&handle)
-                    .map(|p| {
-                        (p.0 - probe_dead.0).abs() > 1.0
-                            || (p.1 - probe_dead.1).abs() > 1.0
+            rx.recv_timeout(std::time::Duration::from_secs(3)).is_ok()
+        };
+        let read_pos = || {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let h = handle.clone();
+            let _ = handle.run_on_main_thread(move || {
+                let p = h
+                    .get_webview_window("recording_overlay")
+                    .and_then(|w| w.scale_factor().ok())
+                    .and_then(|scale| {
+                        h.get_webview_window("recording_overlay")
+                            .and_then(|w| w.outer_position().ok())
+                            .map(|p| {
+                                serde_json::json!({
+                                    "x": p.x as f64 / scale,
+                                    "y": p.y as f64 / scale,
+                                })
+                            })
                     });
-                results.insert(
-                    "probe_dead_corner_rejected".into(),
-                    serde_json::json!(dead_rejected.unwrap_or(true)),
-                );
-
-                let probe_valid = (1250.0f64, 40.0f64);
-                let _ = crate::shortcut::set_overlay_pill_position(
-                    handle.clone(),
-                    probe_valid.0,
-                    probe_valid.1,
-                );
-                let valid_accepted = effective_saved_pill_position(&handle)
-                    .map(|p| {
-                        (p.0 - probe_valid.0).abs() <= 1.0
-                            && (p.1 - probe_valid.1).abs() <= 1.0
-                    })
+                let _ = tx.send(p);
+            });
+            rx.recv_timeout(std::time::Duration::from_secs(3))
+                .ok()
+                .flatten()
+        };
+        let visible = || {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let h = handle.clone();
+            let _ = handle.run_on_main_thread(move || {
+                let v = h
+                    .get_webview_window("recording_overlay")
+                    .and_then(|w| w.is_visible().ok())
                     .unwrap_or(false);
-                results.insert(
-                    "probe_top_right_saved".into(),
-                    serde_json::json!(valid_accepted),
-                );
-            } else {
-                results.insert("moved".into(), serde_json::json!(false));
-                results.insert("restored".into(), serde_json::json!(false));
+                let _ = tx.send(v);
+            });
+            rx.recv_timeout(std::time::Duration::from_secs(3)).unwrap_or(false)
+        };
+
+        let mut results = serde_json::Map::new();
+
+        // 1. show idle, confirm visible
+        on_main(Box::new(|| {}));
+        let h2 = handle.clone();
+        on_main(Box::new(move || show_overlay_state(&h2, "idle")));
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        let p1 = read_pos();
+        results.insert("shown".into(), serde_json::json!(p1.is_some() && visible()));
+
+        // 2. move + persist through the drag-persist path, verify honestly
+        if let Some(target_json) = p1.clone() {
+            let tx = target_json["x"].as_f64().unwrap_or(700.0) + 120.0;
+            let ty = (target_json["y"].as_f64().unwrap_or(880.0) - 60.0).max(40.0);
+            let h2 = handle.clone();
+            on_main(Box::new(move || {
+                if let Some(win) = h2.get_webview_window("recording_overlay") {
+                    let _ = win.set_position(tauri::Position::Logical(
+                        tauri::LogicalPosition { x: tx, y: ty },
+                    ));
+                }
+            }));
+            if let Err(e) = crate::shortcut::set_overlay_pill_position(
+                handle.clone(),
+                tx,
+                ty,
+            ) {
+                log::warn!("sttts: pill test persist failed: {e}");
             }
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            let p2 = read_pos();
+            let moved = p2
+                .map(|p| {
+                    (p["x"].as_f64().unwrap_or(0.0) - tx).abs() < 3.0
+                        && (p["y"].as_f64().unwrap_or(0.0) - ty).abs() < 3.0
+                })
+                .unwrap_or(false);
+            results.insert("moved".into(), serde_json::json!(moved));
 
-            let ok = results.values().all(|v| v.as_bool().unwrap_or(false));
-            results.insert("ok".into(), serde_json::json!(ok));
+            // 3. restore path: re-show must come from the saved spot
+            let h3 = handle.clone();
+            on_main(Box::new(move || show_overlay_state(&h3, "idle")));
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            let p3 = read_pos();
+            let restored = p3
+                .map(|p| {
+                    (p["x"].as_f64().unwrap_or(0.0) - tx).abs() < 3.0
+                        && (p["y"].as_f64().unwrap_or(0.0) - ty).abs() < 3.0
+                })
+                .unwrap_or(false);
+            results.insert("restored".into(), serde_json::json!(restored));
 
-            let verdict_path =
-                crate::portable::app_data_dir(&handle).map(|dir| {
-                    dir.join("pill_test_result.json")
-                });
-            if let Ok(path) = verdict_path {
-                let _ = serde_json::to_string_pretty(&results)
-                    .map(|json| std::fs::write(path, json));
-            }
-            log::info!("sttts: pill self-test verdict: {:?}", results);
+            // 4. state morph: the streaming panel is 400x170 — starting a
+            // dictation at the top-right must clamp fully on-screen instead
+            // of clipping off the right edge (the user's report).
+            let h4 = handle.clone();
+            on_main(Box::new(move || show_overlay_state(&h4, "streaming")));
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            let p4 = read_pos();
+            // 1470x956 logical main display; streaming window is 400x170.
+            // Fully on-screen: x in [0, 1470-400], y in [28, 956-170].
+            let streaming_ok = p4
+                .map(|p| {
+                    let x = p["x"].as_f64().unwrap_or(-1.0);
+                    let y = p["y"].as_f64().unwrap_or(-1.0);
+                    x >= 0.0 && x <= 1470.0 - 400.0 && y >= 28.0 && y <= 956.0 - 170.0
+                })
+                .unwrap_or(false);
+            results.insert(
+                "streaming_clamped".into(),
+                serde_json::json!(streaming_ok && visible()),
+            );
 
-            // Leave the pill where the test moved it — the user sees the
-            // outcome on screen; the app stays running.
-        });
+            // 5. edge probes (deep eval): a dead-corner position must be
+            // rejected by the guard, a valid top-right position accepted.
+            let _ = crate::shortcut::set_overlay_pill_position(
+                handle.clone(),
+                1400.0,
+                10.0,
+            );
+            let dead_rejected = effective_saved_pill_position(&handle)
+                .map(|p| (p.0 - 1400.0).abs() > 1.0 || (p.1 - 10.0).abs() > 1.0)
+                .unwrap_or(true);
+            results.insert(
+                "probe_dead_corner_rejected".into(),
+                serde_json::json!(dead_rejected),
+            );
+
+            let _ = crate::shortcut::set_overlay_pill_position(
+                handle.clone(),
+                1250.0,
+                40.0,
+            );
+            let valid_accepted = effective_saved_pill_position(&handle)
+                .map(|p| (p.0 - 1250.0).abs() <= 1.0 && (p.1 - 40.0).abs() <= 1.0)
+                .unwrap_or(false);
+            results.insert(
+                "probe_top_right_saved".into(),
+                serde_json::json!(valid_accepted),
+            );
+
+            // Leave the pill top-right, visible, as the outcome on screen.
+            let h5 = handle.clone();
+            on_main(Box::new(move || show_overlay_state(&h5, "idle")));
+        } else {
+            results.insert("moved".into(), serde_json::json!(false));
+            results.insert("restored".into(), serde_json::json!(false));
+            results.insert("streaming_clamped".into(), serde_json::json!(false));
+            results.insert(
+                "probe_dead_corner_rejected".into(),
+                serde_json::json!(false),
+            );
+            results.insert("probe_top_right_saved".into(), serde_json::json!(false));
+        }
+
+        let ok = results.values().all(|v| v.as_bool().unwrap_or(false));
+        results.insert("ok".into(), serde_json::json!(ok));
+
+        if let Ok(path) =
+            crate::portable::app_data_dir(&handle).map(|dir| dir.join("pill_test_result.json"))
+        {
+            let _ = serde_json::to_string_pretty(&results)
+                .map(|json| std::fs::write(path, json));
+        }
+        log::info!("sttts: pill self-test verdict: {:?}", results);
     });
 }
 
@@ -879,6 +934,33 @@ fn pill_pos_on_any_monitor(app_handle: &AppHandle, x: f64, y: f64) -> bool {
 /// applies. Exposed for the --pill-test probes.
 pub fn effective_saved_pill_position(app_handle: &AppHandle) -> Option<(f64, f64)> {
     saved_pill_position(app_handle)
+}
+
+/// sttts: clamp a target position so the window of `width`x`height` lies
+/// fully on the monitor with the cursor, with a menu-bar reserve at the top.
+/// This is the last line of defense at show time: a saved idle position is
+/// fine for the small card but the streaming panel is 400px wide and would
+/// otherwise clip off the right edge ("die Pill verschwindet").
+fn clamp_to_monitor(
+    app_handle: &AppHandle,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> (f64, f64) {
+    let Some(monitor) = get_monitor_with_cursor(app_handle) else {
+        return (x, y);
+    };
+    let scale = monitor.scale_factor();
+    let mx = monitor.position().x as f64 / scale;
+    let my = monitor.position().y as f64 / scale;
+    let mw = monitor.size().width as f64 / scale;
+    let mh = monitor.size().height as f64 / scale;
+    const TOP_RESERVE: f64 = 28.0;
+    (
+        x.clamp(mx, (mx + mw - width).max(mx)),
+        y.clamp(my + TOP_RESERVE, (my + mh - height).max(my + TOP_RESERVE)),
+    )
 }
 
 fn saved_pill_position(app_handle: &AppHandle) -> Option<(f64, f64)> {

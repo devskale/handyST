@@ -487,9 +487,8 @@ function usePillDrag() {
     // to the webview. Poll until the position is stable, then persist once.
     let last: string | null = null;
     let stable = 0;
-    let tries = 0;
+    let persistTimer: number | undefined;
     const iv = window.setInterval(async () => {
-      tries++;
       try {
         const win = getCurrentWebviewWindow();
         let pos = await win.position();
@@ -544,16 +543,31 @@ function usePillDrag() {
         }
 
         const key = `${pos.x}:${pos.y}`;
-        if (key === last) stable++;
-        else stable = 0;
-        last = key;
-        // No try cap: a slow drag is legitimate. The poll ends when the
-        // position has settled.
-        if (stable >= 2) {
-          window.clearInterval(iv);
-          const scale = await win.scaleFactor();
-          await commands.setOverlayPillPosition(pos.x / scale, pos.y / scale);
-          void commands.setOverlayPillDragging(false);
+        // Persist on every ~400ms stillness, but KEEP the poll alive for the
+        // whole drag: exiting at the first stillness re-opened the
+        // vanish-at-the-edge hole (a drag with pauses ran clamp-free). The
+        // poll retires only after 30s without movement; a new pointerdown
+        // restarts it.
+        if (key !== last) {
+          stable = 0;
+          last = key;
+          if (persistTimer) clearTimeout(persistTimer);
+          persistTimer = window.setTimeout(async () => {
+            try {
+              const w2 = getCurrentWebviewWindow();
+              const p2 = await w2.position();
+              const s2 = await w2.scaleFactor();
+              await commands.setOverlayPillPosition(p2.x / s2, p2.y / s2);
+            } catch {
+              /* next tick retries */
+            }
+          }, 400);
+        } else {
+          stable++;
+          if (stable > 120) {
+            window.clearInterval(iv);
+            void commands.setOverlayPillDragging(false);
+          }
         }
       } catch {
         window.clearInterval(iv);
