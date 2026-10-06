@@ -276,6 +276,12 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         overlay::show_idle_pill(app_handle);
     }
 
+    // sttts: --pill-test self-test (drives show/move/persist/restore, writes
+    // pill_test_result.json, keeps the app running with the outcome on screen)
+    if app_handle.state::<CliArgs>().pill_test {
+        overlay::run_pill_test(app_handle);
+    }
+
     // Refresh tray menu when model state changes
     let app_handle_for_listener = app_handle.clone();
     app_handle.listen("model-state-changed", move |_| {

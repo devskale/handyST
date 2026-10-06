@@ -699,6 +699,94 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
     }
 }
 
+/// sttts: --pill-test self-test. Drives the full pill lifecycle from code —
+/// show → read position → move + persist (the drag-persist code path) →
+/// re-show (restore path) → verify — and writes a verdict JSON next to the
+/// settings store. Lets CI/an agent validate pill changes without a human or
+/// screen captures.
+pub fn run_pill_test(app_handle: &AppHandle) {
+    let handle = app_handle.clone();
+    std::thread::spawn(move || {
+        // Give the overlay webview time to load its JS (the state re-request
+        // runs on mount).
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        let handle2 = handle.clone();
+        let _ = handle.run_on_main_thread(move || {
+            let handle = handle2;
+            let mut results = serde_json::Map::new();
+
+            // 1. show idle and read the position
+            show_overlay_state(&handle, "idle");
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            let pos1 = handle
+                .get_webview_window("recording_overlay")
+                .and_then(|w| w.outer_position().ok());
+            results.insert("shown".into(), serde_json::json!(pos1.is_some()));
+
+            // 2. move + persist through the drag-persist path
+            let target = pos1.map(|p| tauri::LogicalPosition {
+                x: p.x as f64 + 120.0,
+                y: (p.y as f64 - 60.0).max(40.0),
+            });
+            if let (Some(win), Some(target)) =
+                (handle.get_webview_window("recording_overlay"), target)
+            {
+                let _ = win.set_position(tauri::Position::Logical(target));
+                // Same persist path as the drag handler.
+                if let Err(e) = crate::shortcut::set_overlay_pill_position(
+                    handle.clone(),
+                    target.x,
+                    target.y,
+                ) {
+                    log::warn!("sttts: pill test persist failed: {e}");
+                }
+                std::thread::sleep(std::time::Duration::from_millis(300));
+                let pos2 = win.outer_position().ok();
+                let moved = pos2
+                    .map(|p| {
+                        (p.x as f64 - target.x).abs() < 2.0
+                            && (p.y as f64 - target.y).abs() < 2.0
+                    })
+                    .unwrap_or(false);
+                results.insert("moved".into(), serde_json::json!(moved));
+
+                // 3. restore path: a fresh show must land at the saved spot
+                show_overlay_state(&handle, "idle");
+                std::thread::sleep(std::time::Duration::from_millis(300));
+                let pos3 = handle
+                    .get_webview_window("recording_overlay")
+                    .and_then(|w| w.outer_position().ok());
+                let restored = pos3
+                    .map(|p| {
+                        (p.x as f64 - target.x).abs() < 2.0
+                            && (p.y as f64 - target.y).abs() < 2.0
+                    })
+                    .unwrap_or(false);
+                results.insert("restored".into(), serde_json::json!(restored));
+            } else {
+                results.insert("moved".into(), serde_json::json!(false));
+                results.insert("restored".into(), serde_json::json!(false));
+            }
+
+            let ok = results.values().all(|v| v.as_bool().unwrap_or(false));
+            results.insert("ok".into(), serde_json::json!(ok));
+
+            let verdict_path =
+                crate::portable::app_data_dir(&handle).map(|dir| {
+                    dir.join("pill_test_result.json")
+                });
+            if let Ok(path) = verdict_path {
+                let _ = serde_json::to_string_pretty(&results)
+                    .map(|json| std::fs::write(path, json));
+            }
+            log::info!("sttts: pill self-test verdict: {:?}", results);
+
+            // Leave the pill where the test moved it — the user sees the
+            // outcome on screen; the app stays running.
+        });
+    });
+}
+
 /// sttts: true while the user is dragging the pill window; repositioning is
 /// suppressed so the backend never fights the OS drag.
 static PILL_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);

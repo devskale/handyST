@@ -247,10 +247,25 @@ const RecordingOverlay: React.FC = () => {
     </button>
   );
 
+  // sttts: the drag handle — identical in every overlay state, so the pill is
+  // movable while idle, recording, streaming and finishing alike.
+  const pillGrip = (
+    <div
+      className="pill-grip"
+      title="Ziehen zum Verschieben"
+      onPointerDown={pillDrag.onPointerDown}
+    >
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+
   // dot (left) | waveform (center) | timer + cancel (right) — same structure for
   // pill & panel, so the Live morph is a pure width change.
   const listeningRow = (showTimer: boolean, showCancel: boolean) => (
     <div className="sbase">
+      {pillGrip}
       <div className="sbase-l">
         <span className={`sdot ${captureReady ? "ready" : "arming"}`} />
       </div>
@@ -266,6 +281,7 @@ const RecordingOverlay: React.FC = () => {
   // listening row, so the label is centered.
   const workingRow = (label: string, showCancel: boolean) => (
     <div className="sbase">
+      {pillGrip}
       <div className="sbase-l">
         <span className="sspinner" />
       </div>
@@ -353,15 +369,7 @@ const RecordingOverlay: React.FC = () => {
       >
         <div className="scard compact">
           <div className="pill-row">
-            <div
-              className="pill-grip"
-              title="Ziehen zum Verschieben"
-              onPointerDown={pillDrag.onPointerDown}
-            >
-              <span />
-              <span />
-              <span />
-            </div>
+            {pillGrip}
             <button
               className="sbase again-btn"
             onClick={() => {
@@ -389,6 +397,8 @@ const RecordingOverlay: React.FC = () => {
         className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
       >
         <div className="scard compact cworking">
+          <div className="pill-row">
+          {pillGrip}
           <button
             className="sbase again-btn"
             onClick={() => {
@@ -407,6 +417,7 @@ const RecordingOverlay: React.FC = () => {
             {/* eslint-disable-next-line i18next/no-literal-string -- action verb */}
             <span className="swork-label">Dictate</span>
           </button>
+          </div>
         </div>
       </div>
     );

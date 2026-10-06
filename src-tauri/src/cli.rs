@@ -24,6 +24,11 @@ pub struct CliArgs {
     #[arg(long)]
     pub cancel: bool,
 
+    /// sttts: run the pill self-test (show → move → persist → restore →
+    /// verify) and write a verdict JSON to the app data dir, then exit.
+    #[arg(long)]
+    pub pill_test: bool,
+
     /// Enable debug mode with verbose logging
     #[arg(long)]
     pub debug: bool,
