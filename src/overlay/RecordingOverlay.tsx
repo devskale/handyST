@@ -142,6 +142,15 @@ const RecordingOverlay: React.FC = () => {
         setStreamText(event.payload);
       });
 
+      // sttts: the webview can finish loading AFTER the backend emitted the
+      // startup show-overlay ("idle") event — the window then sits invisible
+      // and silently swallows clicks. Ask for the current state on mount.
+      try {
+        await commands.showIdlePillIfEnabled();
+      } catch (e) {
+        console.warn("sttts: overlay state re-request failed:", e);
+      }
+
       const unlistenPhase = await events.streamPhaseEvent.listen((event) => {
         const payload: StreamPhaseEvent = event.payload;
         setPhase(payload.phase);
