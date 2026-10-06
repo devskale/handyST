@@ -819,11 +819,13 @@ fn pill_pos_on_any_monitor(app_handle: &AppHandle, x: f64, y: f64) -> bool {
         let my = m.position().y as f64 / scale;
         let mw = m.size().width as f64 / scale;
         let mh = m.size().height as f64 / scale;
-        // The WHOLE window must stay on-screen — a pill hanging halfway off
-        // the right edge reads as "vanished".
-        x >= mx
+        // The visible CARD (172 px, centered with ~42 px inset in the 256 px
+        // window) must stay on-screen — the invisible window margin may
+        // overhang, otherwise dragging the card edge to the screen edge gets
+        // rejected and the pill teleports back on the next show.
+        x >= mx - 42.0
             && y >= my
-            && x + OVERLAY_WIDTH <= mx + mw
+            && x + OVERLAY_WIDTH - 42.0 <= mx + mw
             && y + OVERLAY_HEIGHT <= my + mh
     })
 }

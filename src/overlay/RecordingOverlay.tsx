@@ -511,9 +511,13 @@ function usePillDrag() {
           const maxY = Math.max(
             ...monitors.map((m) => m.position.y + m.size.height),
           );
+          // Card-aware margins: the visible card sits 42px inside the window,
+          // so the window may overhang an edge by that much without the card
+          // clipping.
+          const inset = 42 * scale;
           const cx = Math.min(
-            Math.max(pos.x, minX),
-            Math.max(minX, maxX - 256 * scale),
+            Math.max(pos.x, minX - inset),
+            Math.max(minX - inset, maxX - (256 * scale - inset)),
           );
           const cy = Math.min(
             Math.max(pos.y, minY),
@@ -529,7 +533,9 @@ function usePillDrag() {
         if (key === last) stable++;
         else stable = 0;
         last = key;
-        if (stable >= 2 || tries > 24) {
+        // No try cap: a slow drag is legitimate. The poll ends when the
+        // position has settled.
+        if (stable >= 2) {
           window.clearInterval(iv);
           const scale = await win.scaleFactor();
           await commands.setOverlayPillPosition(pos.x / scale, pos.y / scale);
