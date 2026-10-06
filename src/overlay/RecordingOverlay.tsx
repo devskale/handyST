@@ -344,8 +344,14 @@ const RecordingOverlay: React.FC = () => {
         className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
       >
         <div className="scard compact">
-          <button
-            className="sbase again-btn"
+          <div className="pill-row">
+            <div className="pill-grip" title="Ziehen zum Verschieben">
+              <span />
+              <span />
+              <span />
+            </div>
+            <button
+              className="sbase again-btn"
             onClick={() => {
               setIsVisible(false);
               commands.toggleDictation();
@@ -356,7 +362,8 @@ const RecordingOverlay: React.FC = () => {
             </span>
             {/* eslint-disable-next-line i18next/no-literal-string -- action verb */}
             <span className="swork-label">Dictate</span>
-          </button>
+            </button>
+          </div>
         </div>
       </div>
     );
