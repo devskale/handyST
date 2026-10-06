@@ -483,97 +483,81 @@ function usePillDrag() {
     window.addEventListener("click", suppress, true);
     setTimeout(() => window.removeEventListener("click", suppress, true), 2000);
 
-    // The OS owns the window during the drag; pointerup may not be delivered
-    // to the webview. Poll until the position is stable, then persist once.
+    // The OS owns the window during the native drag; pointerup is not
+    // reliably delivered to the webview. NEVER move the window while the
+    // drag is live — an async setPosition inside the drag loop fights the
+    // session and makes the pill jump with the cursor decoupled. Instead,
+    // watch the position and, once it has been still for 400ms (drag over),
+    // clamp it fully on-screen once and persist the clamped spot.
     let last: string | null = null;
     let stable = 0;
-    let persistTimer: number | undefined;
     const iv = window.setInterval(async () => {
       try {
         const win = getCurrentWebviewWindow();
-        let pos = await win.position();
-
-        // sttts: soft walls — the OS drag happily moves the window past the
-        // screen edge, where it gets clipped pixel by pixel ("sie
-        // verschwindet langsam", worst in dead corners of the multi-monitor
-        // bounding box). Clamp per-monitor: onto the display the window's
-        // center is on (nearest when fully outside), with a menu-bar reserve
-        // at the top (the status panel draws behind it) and the 42px card
-        // inset at the left/right edges.
-        const [scale, monitors] = await Promise.all([
-          win.scaleFactor(),
-          availableMonitors(),
-        ]);
-        if (monitors.length > 0) {
-          const cxw = pos.x + (256 * scale) / 2;
-          const cyw = pos.y + (64 * scale) / 2;
-          const centerDist = (m: {
-            position: { x: number; y: number };
-            size: { width: number; height: number };
-          }) => {
-            const mx2 = m.position.x + m.size.width;
-            const my2 = m.position.y + m.size.height;
-            const dx = Math.max(m.position.x - cxw, 0, cxw - mx2);
-            const dy = Math.max(m.position.y - cyw, 0, cyw - my2);
-            return dx * dx + dy * dy;
-          };
-          const mon = [...monitors].sort(
-            (a, b) => centerDist(a) - centerDist(b),
-          )[0];
-          const inset = 42 * scale;
-          const topReserve = 28 * scale;
-          const cx = Math.min(
-            Math.max(pos.x, mon.position.x - inset),
-            Math.max(
-              mon.position.x - inset,
-              mon.position.x + mon.size.width - (256 * scale - inset),
-            ),
-          );
-          const cy = Math.min(
-            Math.max(pos.y, mon.position.y + topReserve),
-            Math.max(
-              mon.position.y + topReserve,
-              mon.position.y + mon.size.height - 64 * scale,
-            ),
-          );
-          if (cx !== pos.x || cy !== pos.y) {
-            pos = new PhysicalPosition(cx, cy);
-            await win.setPosition(pos);
-          }
-        }
-
+        const pos = await win.position();
         const key = `${pos.x}:${pos.y}`;
-        // Persist on every ~400ms stillness, but KEEP the poll alive for the
-        // whole drag: exiting at the first stillness re-opened the
-        // vanish-at-the-edge hole (a drag with pauses ran clamp-free). The
-        // poll retires only after 30s without movement; a new pointerdown
-        // restarts it.
         if (key !== last) {
           stable = 0;
           last = key;
-          if (persistTimer) clearTimeout(persistTimer);
-          persistTimer = window.setTimeout(async () => {
-            try {
-              const w2 = getCurrentWebviewWindow();
-              const p2 = await w2.position();
-              const s2 = await w2.scaleFactor();
-              await commands.setOverlayPillPosition(p2.x / s2, p2.y / s2);
-            } catch {
-              /* next tick retries */
-            }
-          }, 400);
         } else {
           stable++;
-          if (stable > 120) {
-            window.clearInterval(iv);
-            void commands.setOverlayPillDragging(false);
+        }
+        if (stable >= 2) {
+          // Drag over: clamp once, then persist the clamped position.
+          window.clearInterval(iv);
+          const [scale, size, monitors] = await Promise.all([
+            win.scaleFactor(),
+            win.outerSize(),
+            availableMonitors(),
+          ]);
+          let clX = pos.x;
+          let clY = pos.y;
+          if (monitors.length > 0) {
+            const cxw = pos.x + size.width / 2;
+            const cyw = pos.y + size.height / 2;
+            const centerDist = (m: {
+              position: { x: number; y: number };
+              size: { width: number; height: number };
+            }) => {
+              const mx2 = m.position.x + m.size.width;
+              const my2 = m.position.y + m.size.height;
+              const dx = Math.max(m.position.x - cxw, 0, cxw - mx2);
+              const dy = Math.max(m.position.y - cyw, 0, cyw - my2);
+              return dx * dx + dy * dy;
+            };
+            const mon = [...monitors].sort(
+              (a, b) => centerDist(a) - centerDist(b),
+            )[0];
+            const inset = 42 * scale;
+            const topReserve = 28 * scale;
+            clX = Math.min(
+              Math.max(pos.x, mon.position.x - inset),
+              Math.max(
+                mon.position.x - inset,
+                mon.position.x +
+                  mon.size.width -
+                  (size.width - inset),
+              ),
+            );
+            clY = Math.min(
+              Math.max(pos.y, mon.position.y + topReserve),
+              Math.max(
+                mon.position.y + topReserve,
+                mon.position.y + mon.size.height - size.height,
+              ),
+            );
           }
+          if (clX !== pos.x || clY !== pos.y) {
+            await win.setPosition(new PhysicalPosition(clX, clY));
+          }
+          await commands.setOverlayPillPosition(clX / scale, clY / scale);
+          void commands.setOverlayPillDragging(false);
         }
       } catch {
         window.clearInterval(iv);
         void commands.setOverlayPillDragging(false);
       }
-    }, 250);
+    }, 200);
   };
 
   return { onPointerDown };

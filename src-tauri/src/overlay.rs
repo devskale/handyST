@@ -963,7 +963,30 @@ fn clamp_to_monitor(
     width: f64,
     height: f64,
 ) -> (f64, f64) {
-    let Some(monitor) = get_monitor_with_cursor(app_handle) else {
+    // Clamp on the monitor the POSITION itself is on (nearest when outside) —
+    // never the cursor's: with the mouse resting on another display, a
+    // cursor-based clamp teleported the pill across screens on every show.
+    let Ok(monitors) = app_handle.available_monitors() else {
+        return (x, y);
+    };
+    let monitor = monitors
+        .iter()
+        .min_by(|a, b| {
+            let d = |m: &tauri::Monitor| {
+                let s = m.scale_factor();
+                let mx2 = m.position().x as f64 / s;
+                let my2 = m.position().y as f64 / s;
+                let mw2 = m.size().width as f64 / s;
+                let mh2 = m.size().height as f64 / s;
+                let dx = (x + width / 2.0).clamp(mx2, mx2 + mw2) - (x + width / 2.0);
+                let dy = (y + height / 2.0).clamp(my2, my2 + mh2) - (y + height / 2.0);
+                dx * dx + dy * dy
+            };
+            d(a)
+                .partial_cmp(&d(b))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    let Some(monitor) = monitor else {
         return (x, y);
     };
     let scale = monitor.scale_factor();
