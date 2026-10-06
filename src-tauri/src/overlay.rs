@@ -782,12 +782,23 @@ pub fn run_pill_test(app_handle: &AppHandle) {
 
         let mut results = serde_json::Map::new();
 
+        // 0. deterministic start: clear any saved drag position so p1 is the
+        // default placement, not whatever a previous run left behind.
+        let h0 = handle.clone();
+        let _ = handle.run_on_main_thread(move || {
+            let mut st = crate::settings::get_settings(&h0);
+            st.overlay_pill_pos = None;
+            crate::settings::write_settings(&h0, st);
+        });
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
         // 1. show idle, confirm visible
         on_main(Box::new(|| {}));
         let h2 = handle.clone();
         on_main(Box::new(move || show_overlay_state(&h2, "idle")));
         std::thread::sleep(std::time::Duration::from_millis(400));
         let p1 = read_pos();
+        results.insert("debug_p1".into(), serde_json::json!(p1));
         results.insert("shown".into(), serde_json::json!(p1.is_some() && visible()));
 
         // 2. move + persist through the drag-persist path, verify honestly
@@ -852,17 +863,47 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                 .ok()
                 .flatten();
             let saved = crate::settings::get_settings(&handle).overlay_pill_pos;
-            let streaming_ok = match clamped {
-                Some((ex, ey)) => {
-                    saved.is_some()
-                        && ex >= 0.0
-                        && ex <= 1470.0 - 400.0
-                        && ey >= 28.0
-                        && ey <= 956.0 - 170.0
-                        && visible()
-                }
-                None => false,
-            };
+            let vis = visible();
+            // Display-independent assertion: the clamped 400x170 spot must
+            // fit fully inside SOME monitor (with the menu-bar reserve).
+            // Hard-coding the main display failed whenever the pill
+            // legitimately lives on the second monitor.
+            let h7 = handle.clone();
+            let (tx3, rx3) = std::sync::mpsc::channel::<bool>();
+            let _ = handle.run_on_main_thread(move || {
+                let fits = if let Ok(monitors) = h7.available_monitors() {
+                    monitors.iter().any(|m| {
+                        let s = m.scale_factor();
+                        let mx2 = m.position().x as f64 / s;
+                        let my2 = m.position().y as f64 / s;
+                        let mw2 = m.size().width as f64 / s;
+                        let mh2 = m.size().height as f64 / s;
+                        clamped.map(|(ex, ey)| {
+                            ex >= mx2
+                                && ey >= my2 + 28.0
+                                && ex + 400.0 <= mx2 + mw2
+                                && ey + 170.0 <= my2 + mh2
+                        })
+                        .unwrap_or(false)
+                    })
+                } else {
+                    false
+                };
+                let _ = tx3.send(fits);
+            });
+            let bounds_ok = rx3
+                .recv_timeout(std::time::Duration::from_secs(3))
+                .unwrap_or(false);
+            results.insert(
+                "debug_stream".into(),
+                serde_json::json!({
+                    "clamped": clamped,
+                    "saved_present": saved.is_some(),
+                    "bounds_ok": bounds_ok,
+                    "visible": vis,
+                }),
+            );
+            let streaming_ok = saved.is_some() && bounds_ok && vis;
             results.insert(
                 "streaming_clamped".into(),
                 serde_json::json!(streaming_ok),
@@ -910,7 +951,22 @@ pub fn run_pill_test(app_handle: &AppHandle) {
             results.insert("probe_top_right_saved".into(), serde_json::json!(false));
         }
 
-        let ok = results.values().all(|v| v.as_bool().unwrap_or(false));
+        // Aggregate only the real checks; the debug_* objects would trip a
+        // naive all(as_bool).
+        const CHECKS: [&str; 6] = [
+            "shown",
+            "moved",
+            "restored",
+            "streaming_clamped",
+            "probe_dead_corner_rejected",
+            "probe_top_right_saved",
+        ];
+        let ok = CHECKS.iter().all(|k| {
+            results
+                .get(*k)
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+        });
         results.insert("ok".into(), serde_json::json!(ok));
 
         if let Ok(path) =
@@ -982,24 +1038,51 @@ fn clamp_to_monitor(
     // never the cursor's: with the mouse resting on another display, a
     // cursor-based clamp teleported the pill across screens on every show.
     let Ok(monitors) = app_handle.available_monitors() else {
+        log::warn!("sttts clamp: no monitors");
         return (x, y);
+    };
+    for m in &monitors {
+        let s = m.scale_factor();
+        log::info!(
+            "sttts clamp: monitor pos=({},{}) size=({},{}) scale={}",
+            m.position().x,
+            m.position().y,
+            m.size().width,
+            m.size().height,
+            s
+        );
+    }
+    // Prefer a monitor that CONTAINS the window's top-left point outright;
+    // only when the point is outside every monitor fall back to the
+    // center-distance nearest. (Edge points could otherwise tie and pick the
+    // neighbouring display, teleporting the pill across screens.)
+    let contains = |m: &tauri::Monitor| {
+        let s = m.scale_factor();
+        let mx2 = m.position().x as f64 / s;
+        let my2 = m.position().y as f64 / s;
+        let mw2 = m.size().width as f64 / s;
+        let mh2 = m.size().height as f64 / s;
+        x >= mx2 && x < mx2 + mw2 && y >= my2 && y < my2 + mh2
     };
     let monitor = monitors
         .iter()
-        .min_by(|a, b| {
-            let d = |m: &tauri::Monitor| {
-                let s = m.scale_factor();
-                let mx2 = m.position().x as f64 / s;
-                let my2 = m.position().y as f64 / s;
-                let mw2 = m.size().width as f64 / s;
-                let mh2 = m.size().height as f64 / s;
-                let dx = (x + width / 2.0).clamp(mx2, mx2 + mw2) - (x + width / 2.0);
-                let dy = (y + height / 2.0).clamp(my2, my2 + mh2) - (y + height / 2.0);
-                dx * dx + dy * dy
-            };
-            d(a)
-                .partial_cmp(&d(b))
-                .unwrap_or(std::cmp::Ordering::Equal)
+        .find(|m| contains(m))
+        .or_else(|| {
+            monitors.iter().min_by(|a, b| {
+                let d = |m: &tauri::Monitor| {
+                    let s = m.scale_factor();
+                    let mx2 = m.position().x as f64 / s;
+                    let my2 = m.position().y as f64 / s;
+                    let mw2 = m.size().width as f64 / s;
+                    let mh2 = m.size().height as f64 / s;
+                    let dx = (x + width / 2.0).clamp(mx2, mx2 + mw2)
+                        - (x + width / 2.0);
+                    let dy = (y + height / 2.0).clamp(my2, my2 + mh2)
+                        - (y + height / 2.0);
+                    dx * dx + dy * dy
+                };
+                d(a).partial_cmp(&d(b)).unwrap_or(std::cmp::Ordering::Equal)
+            })
         });
     let Some(monitor) = monitor else {
         return (x, y);
