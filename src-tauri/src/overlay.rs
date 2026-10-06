@@ -545,10 +545,10 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
             #[cfg(not(target_os = "windows"))]
             let set_pos_elapsed =
                 // sttts: a user-dragged pill position wins over the centered
-                // top/bottom placement.
-                if let Some((x, y)) = settings::get_settings(app_handle)
-                    .overlay_pill_pos
-                    .map(|p| (p.x, p.y))
+                // top/bottom placement — unless the user is dragging right now.
+                if pill_dragging() {
+                    std::time::Duration::ZERO
+                } else if let Some((x, y)) = saved_pill_position(app_handle)
                     .or_else(|| calculate_overlay_position(app_handle, width, height))
                 {
                     let set_pos_started = std::time::Instant::now();
@@ -686,17 +686,53 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
             let (width, height) = current_overlay_logical_size(&overlay_window)
                 .unwrap_or((OVERLAY_WIDTH, OVERLAY_HEIGHT));
             // sttts: a user-dragged pill position wins over the centered
-            // top/bottom placement.
-            let saved = settings::get_settings(app_handle).overlay_pill_pos;
-            if let Some((x, y)) = saved
-                .map(|p| (p.x, p.y))
-                .or_else(|| calculate_overlay_position(app_handle, width, height))
-            {
-                let _ = overlay_window
-                    .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+            // top/bottom placement — unless the user is dragging right now.
+            if !pill_dragging() {
+                if let Some((x, y)) = saved_pill_position(app_handle)
+                    .or_else(|| calculate_overlay_position(app_handle, width, height))
+                {
+                    let _ = overlay_window
+                        .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+                }
             }
         }
     }
+}
+
+/// sttts: true while the user is dragging the pill window; repositioning is
+/// suppressed so the backend never fights the OS drag.
+static PILL_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+pub fn set_pill_dragging(active: bool) {
+    PILL_DRAG_ACTIVE.store(active, Ordering::SeqCst);
+}
+
+fn pill_dragging() -> bool {
+    PILL_DRAG_ACTIVE.load(Ordering::SeqCst)
+}
+
+/// sttts: a saved pill position is only used when it still lands on a known
+/// monitor (logical coordinates). Guards against stale/garbage values
+/// parking the pill off-screen (e.g. top-left after a display change).
+fn pill_pos_on_any_monitor(app_handle: &AppHandle, x: f64, y: f64) -> bool {
+    let Ok(monitors) = app_handle.available_monitors() else {
+        return false;
+    };
+    monitors.iter().any(|m| {
+        let scale = m.scale_factor();
+        let mx = m.position().x as f64 / scale;
+        let my = m.position().y as f64 / scale;
+        let mw = m.size().width as f64 / scale;
+        let mh = m.size().height as f64 / scale;
+        x >= mx - 200.0 && x <= mx + mw && y >= my - 200.0 && y <= my + mh
+    })
+}
+
+fn saved_pill_position(app_handle: &AppHandle) -> Option<(f64, f64)> {
+    settings::get_settings(app_handle)
+        .overlay_pill_pos
+        .filter(|p| pill_pos_on_any_monitor(app_handle, p.x, p.y))
+        .map(|p| (p.x, p.y))
 }
 
 /// Generation counter bumped every time the overlay is shown. The delayed

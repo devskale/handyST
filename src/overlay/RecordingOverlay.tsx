@@ -418,89 +418,65 @@ const RecordingOverlay: React.FC = () => {
 
 
 /**
- * sttts: drag handling for the pill/overlay window. A press that moves more
- * than the threshold drags the window (manual setPosition — a data-tauri
- * drag region would swallow the click-to-dictate buttons); a plain click
- * still reaches the buttons. After 600ms without movement the position is
+ * sttts: drag handling for the pill/overlay window. pointerdown hands the
+ * window to the OS-native drag (startDragging) — no manual position math,
+ * which used to fight the backend's show-time repositioning and jump around.
+ * A plain click without movement still reaches the buttons (distance-checked
+ * in the click-capture phase). Once the window settles, the position is
  * persisted (logical coordinates) and wins over the centered default.
  */
-const PILL_DRAG_THRESHOLD_PX = 6;
-const PILL_SAVE_DELAY_MS = 600;
+const PILL_CLICK_SUPPRESS_PX = 6;
 
 function usePillDrag() {
-  const draggedRef = useRef(false);
-  const saveTimerRef = useRef<number | undefined>(undefined);
-
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, []);
-
-  const persist = () => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(async () => {
-      try {
-        const win = getCurrentWebviewWindow();
-        const pos = await win.position();
-        const scale = await win.scaleFactor();
-        await commands.setOverlayPillPosition(pos.x / scale, pos.y / scale);
-      } catch (e) {
-        console.warn("sttts: persisting pill position failed:", e);
-      }
-    }, PILL_SAVE_DELAY_MS);
-  };
-
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     const startX = e.clientX;
     const startY = e.clientY;
-    draggedRef.current = false;
-    let origin: { x: number; y: number; scale: number } | null = null;
+    void commands.setOverlayPillDragging(true);
+    void getCurrentWebviewWindow().startDragging();
 
-    const move = (ev: PointerEvent) => {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-      if (!origin) {
-        if (Math.hypot(dx, dy) < PILL_DRAG_THRESHOLD_PX) return;
-        draggedRef.current = true;
-        void (async () => {
-          const win = getCurrentWebviewWindow();
-          const pos = await win.position();
+    // A dragged release must not also fire the pill's click-to-dictate.
+    const suppress = (click: MouseEvent) => {
+      window.removeEventListener("click", suppress, true);
+      if (
+        Math.hypot(click.clientX - startX, click.clientY - startY) >
+        PILL_CLICK_SUPPRESS_PX
+      ) {
+        click.stopPropagation();
+        click.preventDefault();
+      }
+    };
+    window.addEventListener("click", suppress, true);
+    setTimeout(() => window.removeEventListener("click", suppress, true), 2000);
+
+    // The OS owns the window during the drag; pointerup may not be delivered
+    // to the webview. Poll until the position is stable, then persist once.
+    let last: string | null = null;
+    let stable = 0;
+    let tries = 0;
+    const iv = window.setInterval(async () => {
+      tries++;
+      try {
+        const win = getCurrentWebviewWindow();
+        const pos = await win.position();
+        const key = `${pos.x}:${pos.y}`;
+        if (key === last) stable++;
+        else stable = 0;
+        last = key;
+        if (stable >= 2 || tries > 24) {
+          window.clearInterval(iv);
           const scale = await win.scaleFactor();
-          origin = { x: pos.x, y: pos.y, scale };
-        })();
-        return;
+          await commands.setOverlayPillPosition(pos.x / scale, pos.y / scale);
+          void commands.setOverlayPillDragging(false);
+        }
+      } catch {
+        window.clearInterval(iv);
+        void commands.setOverlayPillDragging(false);
       }
-      if (!origin) return;
-      void getCurrentWebviewWindow().setPosition(
-        new PhysicalPosition(
-          Math.round(origin.x + dx * origin.scale),
-          Math.round(origin.y + dy * origin.scale),
-        ),
-      );
-      persist();
-    };
-
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      if (draggedRef.current) {
-        setTimeout(persist, 50);
-        const suppress = (click: MouseEvent) => {
-          click.stopPropagation();
-          click.preventDefault();
-          window.removeEventListener("click", suppress, true);
-        };
-        window.addEventListener("click", suppress, true);
-        setTimeout(() => window.removeEventListener("click", suppress, true), 150);
-      }
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+    }, 250);
   };
 
-  return { onPointerDown, draggedRef };
+  return { onPointerDown };
 }
 
 export default RecordingOverlay;

@@ -554,6 +554,14 @@ async checkRemoteTranscription() : Promise<Result<RemoteCheckResult, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async setOverlayPillDragging(active: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_overlay_pill_dragging", { active }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async setOverlayPillPosition(x: number, y: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_overlay_pill_position", { x, y }) };

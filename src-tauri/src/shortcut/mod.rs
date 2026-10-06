@@ -1438,6 +1438,15 @@ pub fn get_remote_transcription_api_key(app: AppHandle) -> Result<String, String
     Ok(settings::load_remote_transcription_api_key(&app))
 }
 
+/// sttts: while the user drags the pill window, the backend must not
+/// reposition it (show/state changes would fight the OS drag).
+#[tauri::command]
+#[specta::specta]
+pub fn set_overlay_pill_dragging(active: bool) -> Result<(), String> {
+    crate::overlay::set_pill_dragging(active);
+    Ok(())
+}
+
 /// sttts: persist the user-dragged pill position (logical coordinates) from
 /// the overlay window's drag handler.
 #[tauri::command]
