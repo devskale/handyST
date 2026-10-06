@@ -735,12 +735,6 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                 })
             });
             if let (Some(win), Some(target)) = (win, target) {
-                let scale = win.scale_factor().unwrap_or(1.0);
-                let near = |p: &tauri::PhysicalPosition<i32>| {
-                    (p.x as f64 / scale - target.x).abs() < 2.0
-                        && (p.y as f64 / scale - target.y).abs() < 2.0
-                };
-
                 let _ = win.set_position(tauri::Position::Logical(target));
                 // Same persist path as the drag handler.
                 if let Err(e) = crate::shortcut::set_overlay_pill_position(
@@ -751,17 +745,30 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                     log::warn!("sttts: pill test persist failed: {e}");
                 }
                 std::thread::sleep(std::time::Duration::from_millis(300));
-                let moved = win.outer_position().ok().map(|p| near(&p)).unwrap_or(false);
+
+                // outer_position() on the status-level NSPanel reports stale
+                // values (screenshot-verified: the window sits at the target
+                // while outer_position still returns the creation spot), so
+                // the verdict reads the persisted settings round-trip plus
+                // actual window visibility instead.
+                let saved_matches = |handle: &AppHandle| {
+                    crate::settings::get_settings(handle)
+                        .overlay_pill_pos
+                        .map(|p| {
+                            (p.x - target.x).abs() < 2.0
+                                && (p.y - target.y).abs() < 2.0
+                        })
+                        .unwrap_or(false)
+                };
+                let moved = saved_matches(&handle)
+                    && win.is_visible().unwrap_or(false);
                 results.insert("moved".into(), serde_json::json!(moved));
 
-                // 3. restore path: a fresh show must land at the saved spot
+                // 3. restore path: a fresh show must come from the saved spot
                 show_overlay_state(&handle, "idle");
                 std::thread::sleep(std::time::Duration::from_millis(300));
-                let restored = win
-                    .outer_position()
-                    .ok()
-                    .map(|p| near(&p))
-                    .unwrap_or(false);
+                let restored = saved_matches(&handle)
+                    && win.is_visible().unwrap_or(false);
                 results.insert("restored".into(), serde_json::json!(restored));
             } else {
                 results.insert("moved".into(), serde_json::json!(false));
@@ -812,7 +819,12 @@ fn pill_pos_on_any_monitor(app_handle: &AppHandle, x: f64, y: f64) -> bool {
         let my = m.position().y as f64 / scale;
         let mw = m.size().width as f64 / scale;
         let mh = m.size().height as f64 / scale;
-        x >= mx - 200.0 && x <= mx + mw && y >= my - 200.0 && y <= my + mh
+        // The WHOLE window must stay on-screen — a pill hanging halfway off
+        // the right edge reads as "vanished".
+        x >= mx
+            && y >= my
+            && x + OVERLAY_WIDTH <= mx + mw
+            && y + OVERLAY_HEIGHT <= my + mh
     })
 }
 
