@@ -340,12 +340,15 @@ const RecordingOverlay: React.FC = () => {
     return (
       <div
         dir={direction}
-        onPointerDown={pillDrag.onPointerDown}
         className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
       >
         <div className="scard compact">
           <div className="pill-row">
-            <div className="pill-grip" title="Ziehen zum Verschieben">
+            <div
+              className="pill-grip"
+              title="Ziehen zum Verschieben"
+              onPointerDown={pillDrag.onPointerDown}
+            >
               <span />
               <span />
               <span />
