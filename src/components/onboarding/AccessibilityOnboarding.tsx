@@ -235,12 +235,10 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
         console.error("Error checking permissions:", error);
         errorCountRef.current += 1;
 
-        if (errorCountRef.current >= MAX_POLLING_ERRORS) {
-          // Stop polling after too many consecutive errors
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
+        if (errorCountRef.current === MAX_POLLING_ERRORS) {
+          // Don't dead-end: the transient backend may recover (e.g. the app
+          // was mid-restart). Surface the failure once and keep polling —
+          // a stuck "waiting" forever is worse than a toast.
           toast.error(t("onboarding.permissions.errors.checkFailed"));
         }
       }
