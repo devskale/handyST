@@ -254,7 +254,6 @@
   padding-left: 14px;
   padding-right: 14px;
   font-size: 15px;
-  font-style: italic;
   line-height: 1.35;
   letter-spacing: -0.003em;
   color: color-mix(in srgb, var(--color-text) 90%, transparent);
