@@ -50,6 +50,22 @@ fn is_final_message(msg: &StreamMessage) -> bool {
     msg.kind == "final" || !msg.partial
 }
 
+/// Percent-encode a query value, keeping only the RFC 3986 unreserved set.
+/// The language hint reaches the WS URL raw from settings — this keeps an
+/// exotic value from producing an invalid request line.
+fn encode_query_value(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(byte as char)
+            }
+            other => out.push_str(&format!("%{other:02X}")),
+        }
+    }
+    out
+}
+
 /// Derive the WebSocket URL from the HTTP base URL:
 /// `http://dgxp:3001` → `ws://dgxp:3001/v1/audio/transcriptions/stream`.
 pub fn stream_url(base_url: &str) -> String {
@@ -101,7 +117,7 @@ impl RemoteStream {
             if !lang.is_empty() {
                 url.push_str(&format!(
                     "?language={}",
-                    lang.trim().to_ascii_lowercase()
+                    encode_query_value(lang.trim().to_ascii_lowercase().as_str())
                 ));
             }
         }
@@ -233,5 +249,19 @@ impl RemoteStream {
     /// Whether the underlying socket is still alive.
     pub fn is_closed(&self) -> bool {
         self.closed.load(Ordering::Relaxed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn query_encoding_keeps_unreserved_and_escapes_the_rest() {
+        assert_eq!(encode_query_value("de"), "de");
+        assert_eq!(encode_query_value("auto"), "auto");
+        assert_eq!(encode_query_value("zh-TW"), "zh-TW");
+        assert_eq!(encode_query_value("a b"), "a%20b");
+        assert_eq!(encode_query_value("x&y=1"), "x%26y%3D1");
     }
 }
