@@ -706,6 +706,10 @@ impl ShortcutAction for TranscribeAction {
 
                 if rm.was_cancelled_since(cancel_generation) {
                     debug!("Transcription operation cancelled after recording stop");
+                    // The live stream would otherwise stay open until the next
+                    // start_stream replaces it — a stale session slot on the
+                    // gateway in the meantime.
+                    tm.cancel_stream();
                     utils::hide_recording_overlay(&ah);
                     change_tray_icon(&ah, TrayIconState::Idle);
                     return;
