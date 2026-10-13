@@ -718,6 +718,7 @@
   "overlay": {
     "transcribing": "Transkribiere...",
     "processing": "Verarbeite...",
+    "loadingModel": "Modell wird geladen...",
     "dictate": "Diktieren",
     "dragTooltip": "Zum Verschieben ziehen"
   },

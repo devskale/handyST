@@ -718,6 +718,7 @@
   "overlay": {
     "transcribing": "Расшифровка...",
     "processing": "Обработка...",
+    "loadingModel": "Загрузка модели...",
     "dictate": "Диктовать",
     "dragTooltip": "Перетащите, чтобы переместить"
   },

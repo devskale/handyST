@@ -11,14 +11,15 @@
   },
   "sidebar": {
     "general": "General",
+    "models": "Models",
     "advanced": "Advanced",
     "postProcessing": "Post Process",
     "history": "History",
     "debug": "Debug",
-    "about": "About",
-    "remoteTranscription": "Remote Transcription"
+    "about": "About"
   },
   "onboarding": {
+    "subtitle": "To get started, choose a transcription model",
     "existingModelsTitle": "Compatible Models",
     "downloadModelsTitle": "Available to Download",
     "showAllModels": "Show all {{total}} models",
@@ -100,14 +101,14 @@
     },
     "permissions": {
       "title": "Permissions Required",
-      "description": "handyST needs a couple of permissions to work properly.",
+      "description": "Handy needs a couple of permissions to work properly.",
       "microphone": {
         "title": "Microphone Access",
-        "description": "Required to hear your dictation."
+        "description": "Required to hear your voice for transcription."
       },
       "accessibility": {
         "title": "Accessibility Access",
-        "description": "Required to type your dictation into your applications."
+        "description": "Required to type transcribed text into your applications."
       },
       "grant": "Grant Permission",
       "granted": "Granted",
@@ -160,7 +161,7 @@
     "general": {
       "title": "General",
       "shortcut": {
-        "title": "handyST Shortcuts",
+        "title": "Handy Shortcuts",
         "description": "Configure keyboard shortcuts to trigger speech-to-text recording",
         "loading": "Loading shortcuts...",
         "none": "No shortcuts configured",
@@ -168,8 +169,8 @@
         "pressKeys": "Press keys...",
         "bindings": {
           "transcribe": {
-            "name": "Dictation key",
-            "description": "The key that starts and stops dictation."
+            "name": "Transcribe Shortcut",
+            "description": "The keyboard shortcut to record and transcribe your voice."
           },
           "cancel": {
             "name": "Cancel Shortcut",
@@ -177,7 +178,7 @@
           },
           "transcribe_with_post_process": {
             "name": "Post-Processing Hotkey",
-            "description": "Optional: a dedicated key that always polishes your dictation with AI post-processing."
+            "description": "Optional: A dedicated hotkey that always applies AI post-processing to your transcription."
           }
         },
         "errors": {
@@ -193,42 +194,40 @@
         "noResults": "No languages found",
         "auto": "Auto"
       },
-      "dictationShortcut": {
-        "label": "Second trigger",
-        "description": "A second way to start/stop dictation (mic key or double-tap). The Dictation key above keeps working",
+      "shortcutActivation": {
+        "title": "Shortcut Behavior",
+        "description": "Choose how the transcribe shortcut starts and stops recording.",
         "options": {
-          "none": "None",
-          "micKey": "Mic key (F5 position)",
-          "ctrlDouble": "Press Control key twice",
-          "globeDouble": "Press Globe/Fn key twice",
-          "cmdLeftDouble": "Press left ⌘ twice",
-          "cmdRightDouble": "Press right ⌘ twice",
-          "optLeftDouble": "Press left ⌥ twice",
-          "optRightDouble": "Press right ⌥ twice"
-        }
-      },
-      "favoriteLanguages": {
-        "label": "Overlay language chips",
-        "description": "Languages offered by the switcher in the recording overlay (comma-separated)"
-      },
-      "shortcutBehavior": {
-        "title": "Shortcut behavior",
-        "description": "How the Dictation key starts and stops recording",
-        "options": {
-          "auto": "Auto",
-          "hold": "Hold",
+          "holdOrToggle": "Auto",
+          "pushToTalk": "Hold",
           "toggle": "Toggle"
         },
         "descriptions": {
-          "hold_or_toggle": "Hold to record, or tap to keep recording until the next tap",
-          "push_to_talk": "Records while you hold the key",
-          "toggle": "Tap to start, tap again to stop"
+          "hold_or_toggle": "Hold to record or tap to toggle",
+          "push_to_talk": "Records while you hold the shortcut",
+          "toggle": "Tap the shortcut to start recording, tap again to stop"
         }
-      },
-      "idlePill": {
-        "label": "Persistent dictation pill",
-        "description": "Keep a small Dictate button on screen while idle — click it to start without the keyboard"
       }
+    },
+    "models": {
+      "title": "Transcription Models",
+      "description": "Select a transcription model or download additional models. Different models offer varying levels of accuracy and speed.",
+      "searchPlaceholder": "Search models by name…",
+      "yourModels": "Downloaded Models",
+      "availableModels": "Available to Download",
+      "deleteConfirm": "Are you sure you want to delete {{modelName}}? You will need to download it again to use it.",
+      "deleteActiveConfirm": "{{modelName}} is your active model. Deleting it will stop transcriptions until you select a new model. Are you sure?",
+      "deleteTitle": "Delete Model",
+      "filters": {
+        "allLanguages": "All Languages",
+        "streaming": "Filter models that support live streaming transcription",
+        "translation": "Filter models that support translation to English"
+      },
+      "rescan": {
+        "label": "Rescan",
+        "tooltip": "Rescan for models added to the models folder or Hugging Face cache outside Handy"
+      },
+      "noModelsMatch": "No models match this filter."
     },
     "sound": {
       "title": "Sound",
@@ -294,16 +293,16 @@
       },
       "autostart": {
         "label": "Launch on Startup",
-        "description": "Automatically start handyST when you log in to your computer."
+        "description": "Automatically start Handy when you log in to your computer."
       },
       "showTrayIcon": {
         "label": "Show Tray Icon",
-        "description": "Display the handyST icon in the system tray."
+        "description": "Display the Handy icon in the system tray."
       },
       "overlay": {
         "style": {
           "title": "Overlay",
-          "description": "Choose the recording overlay: None hides it, Minimal shows a compact pill, Live shows your dictation as you speak.",
+          "description": "Choose the recording overlay: None hides it, Minimal shows a compact pill, Live shows transcription in real time as you speak (streaming-capable models only — look for the Streaming badge in the model picker). On Linux 'None' is recommended.",
           "options": {
             "none": "None",
             "minimal": "Minimal",
@@ -399,14 +398,6 @@
       "fillerWordRemoval": {
         "title": "Remove Filler Words",
         "description": "Removes common hesitation words from transcriptions. Turn off to keep them."
-      },
-      "recordingBuffer": {
-        "title": "Trailing recording buffer",
-        "description": "Keep recording this long after you stop, so last words still land. 0 = off."
-      },
-      "autoStopSilence": {
-        "title": "Auto-stop on silence",
-        "description": "End the recording after this much silence following speech (like macOS dictation). Requires Voice Activity Detection; applies from the next recording."
       },
       "chineseScript": {
         "title": "Chinese Script",
@@ -606,9 +597,13 @@
         "title": "Reliable Paste (Beta)",
         "description": "Restore the clipboard only after the target app actually reads the transcription, instead of after a fixed delay. Intended to fix old clipboard content being pasted under system load. Requires a clipboard paste method; macOS and Windows only."
       },
+      "recordingBuffer": {
+        "title": "Extra Recording Buffer",
+        "description": "Extra time (in milliseconds) to keep recording after you release the key, to capture trailing audio. 0 = no extra buffer."
+      },
       "keyboardDiagnostic": {
         "title": "Keyboard Diagnostic",
-        "description": "Checks whether keyboard events reach handyST. Only event counts are recorded — never which keys you press.",
+        "description": "Checks whether keyboard events reach Handy. Only event counts are recorded — never which keys you press.",
         "run": "Run 10s diagnostic",
         "running": "Listening… press your shortcut a few times (e.g. Option+Space)",
         "secureInputLabel": "Secure Input",
@@ -622,7 +617,7 @@
         "mouse": "Mouse",
         "verdictBlocked": "Secure Input is blocking key events — keyed shortcuts cannot work until it is resolved.",
         "verdictSuspicious": "Modifier events arrived but no key events — something is suppressing keys even though Secure Input reports disabled. Please report this on GitHub.",
-        "verdictOk": "Key events are reaching handyST normally.",
+        "verdictOk": "Key events are reaching Handy normally.",
         "verdictNoEvents": "No events captured — did you press any keys during the test?",
         "failed": "Diagnostic failed: {{error}}"
       }
@@ -631,65 +626,32 @@
       "title": "About",
       "version": {
         "title": "Version",
-        "description": "Current version of handyST"
+        "description": "Current version of Handy"
       },
       "whatsNewUpdates": {
         "label": "Show What's New",
-        "description": "Show release notes after handyST updates"
+        "description": "Show release notes after Handy updates"
       },
       "appDataDirectory": {
         "title": "App Data Directory",
-        "description": "Location where handyST stores its data"
+        "description": "Location where Handy stores its data"
       },
       "sourceCode": {
         "title": "Source Code",
-        "description": "handyST is a fork of Handy (github.com/cjpais/Handy) with remote streaming transcription",
+        "description": "View source code and contribute",
         "button": "View on GitHub"
       },
       "supportDevelopment": {
         "title": "Support Development",
-        "description": "Help us continue building handyST",
+        "description": "Help us continue building Handy",
         "button": "Donate"
       },
       "acknowledgments": {
         "title": "Acknowledgments",
         "ggml": {
           "title": "ggml",
-          "description": "handyST's on-device inference used transcribe.cpp and ggml — removed in this fork, with thanks to Georgi Gerganov and contributors",
-          "details": "handyST's local speech-to-text is built on transcribe.cpp and ggml. Thanks to the amazing work by Georgi Gerganov and contributors."
-        }
-      }
-    },
-    "remoteTranscription": {
-      "title": "Remote Transcription",
-      "enabled": {
-        "label": "Use remote transcription",
-        "description": "Send recordings to an OpenAI-compatible /v1/audio/transcriptions endpoint instead of local models."
-      },
-      "baseUrl": {
-        "label": "Base URL",
-        "description": "Root URL of the gateway, e.g. http://dgxp:3001."
-      },
-      "model": {
-        "label": "Model",
-        "description": "Model name passed in the multipart request."
-      },
-      "apiKey": {
-        "label": "API Key",
-        "description": "Bearer token, stored in the macOS Keychain."
-      },
-      "check": {
-        "title": "Status",
-        "description": "Checks the gateway and whether the transcription and speech models are up.",
-        "button": "Check again",
-        "running": "Checking…",
-        "summaryOk": "Everything is up.",
-        "summaryFail": "Not everything is reachable.",
-        "components": {
-          "gateway": "Gateway",
-          "models": "Models",
-          "stt": "Transcription (STT)",
-          "tts": "Speech (TTS)"
+          "description": "High-performance tensor library for on-device machine learning inference",
+          "details": "Handy's local speech-to-text is built on transcribe.cpp and ggml. Thanks to the amazing work by Georgi Gerganov and contributors."
         }
       }
     }
@@ -710,7 +672,7 @@
     "portableUpdateBrowseButton": "Open GitHub Releases"
   },
   "whatsNew": {
-    "title": "New in handyST v{{version}}"
+    "title": "New in Handy v{{version}}"
   },
   "common": {
     "loading": "Loading...",
@@ -722,7 +684,7 @@
     "noOptionsFound": "No options found"
   },
   "accessibility": {
-    "permissionsDescription": "handyST needs accessibility permissions to type transcribed text.",
+    "permissionsDescription": "Handy needs accessibility permissions to type transcribed text.",
     "openSettings": "Open System Settings"
   },
   "errors": {
@@ -737,6 +699,7 @@
     "noInputDeviceTitle": "No Microphone Found",
     "noInputDevice": "No audio input device was detected. Please connect a microphone or headset and try again.",
     "recordingFailed": "Failed to start recording: {{error}}",
+    "modelLoadFailed": "Failed to load model: {{model}}",
     "modelLoadFailedUnknown": "unknown model",
     "pasteFailedTitle": "Failed to Paste Text",
     "pasteFailed": "Text could not be pasted into the active application.",
@@ -744,11 +707,11 @@
   },
   "appLanguage": {
     "title": "Application Language",
-    "description": "Change the language of the handyST interface"
+    "description": "Change the language of the Handy interface"
   },
   "theme": {
     "title": "Application Theme",
-    "description": "Choose whether handyST follows your system theme or stays light or dark",
+    "description": "Choose whether Handy follows your system theme or stays light or dark",
     "options": {
       "system": "System",
       "light": "Light",
@@ -758,8 +721,7 @@
   "overlay": {
     "transcribing": "Transcribing...",
     "processing": "Processing...",
-    "languageAutoTooltip": "Automatic language detection",
-    "languageForceTooltip": "Force {{lang}} (next recording)",
+    "loadingModel": "Loading model...",
     "dictate": "Dictate",
     "dragTooltip": "Drag to move"
   },

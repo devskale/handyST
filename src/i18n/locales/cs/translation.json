@@ -718,6 +718,7 @@
   "overlay": {
     "transcribing": "Přepisuji...",
     "processing": "Zpracovávám...",
+    "loadingModel": "Načítání modelu...",
     "dictate": "Diktovat",
     "dragTooltip": "Přetažením přesunete"
   },

@@ -721,6 +721,7 @@
   "overlay": {
     "transcribing": "ट्रांसक्राइब हो रहा है...",
     "processing": "प्रोसेस हो रहा है...",
+    "loadingModel": "मॉडल लोड हो रहा है...",
     "dictate": "डिक्टेट",
     "dragTooltip": "मूव करने के लिए खींचें"
   },

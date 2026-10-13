@@ -718,6 +718,7 @@
   "overlay": {
     "transcribing": "מתמלל...",
     "processing": "מעבד...",
+    "loadingModel": "טוען מודל...",
     "dictate": "הכתבה",
     "dragTooltip": "גרור כדי להזיז"
   },

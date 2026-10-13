@@ -721,6 +721,7 @@
   "overlay": {
     "transcribing": "Mentranskripsikan...",
     "processing": "Memproses...",
+    "loadingModel": "Memuat model...",
     "dictate": "Dikte",
     "dragTooltip": "Seret untuk memindahkan"
   },

@@ -718,6 +718,7 @@
   "overlay": {
     "transcribing": "Транскрибиране...",
     "processing": "Обработка...",
+    "loadingModel": "Зареждане на модела...",
     "dictate": "Диктирай",
     "dragTooltip": "Плъзнете, за да преместите"
   },
