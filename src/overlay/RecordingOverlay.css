@@ -106,14 +106,18 @@
 .ov-stage {
   position: fixed;
   inset: 0;
-  cursor: grab; /* sttts: pill is draggable; click-to-dictate still works */
-}
-.ov-stage:active {
-  cursor: grabbing;
+  /* Layout + font live on the BASE rule: keeping them inside :active (as a
+     previous revision did) left the card flush-left/top in its window and in
+     the serif fallback font whenever the mouse was up, snapping into place
+     only while pressed — which is the rest state 99% of the time. */
   display: flex;
   justify-content: center; /* horizontal centering, kept for both forms */
   align-items: flex-end; /* bottom placement: flush to the bottom edge */
   font-family: var(--s-font);
+  cursor: grab; /* sttts: pill is draggable; click-to-dictate still works */
+}
+.ov-stage:active {
+  cursor: grabbing;
 }
 .ov-stage.top {
   align-items: flex-start; /* top placement: flush to the top edge */
