@@ -1043,7 +1043,7 @@ fn clamp_to_monitor(
     };
     for m in &monitors {
         let s = m.scale_factor();
-        log::info!(
+        log::debug!(
             "sttts clamp: monitor pos=({},{}) size=({},{}) scale={}",
             m.position().x,
             m.position().y,
@@ -1198,6 +1198,62 @@ pub fn emit_levels(app_handle: &AppHandle, levels: &[f32]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The `--ov-*` custom props in RecordingOverlay.css are the single
+    /// source of truth for the visible card; the native window sizes above
+    /// must cover the card's max footprint per state (see the comment on
+    /// OVERLAY_WIDTH). Reads the CSS at compile time so the two can't drift
+    /// silently.
+    fn css_card_px(prop: &str) -> f64 {
+        let css = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../src/overlay/RecordingOverlay.css"
+        ));
+        let needle = format!("--{prop}:");
+        let line = css
+            .lines()
+            .find(|l| l.trim_start().starts_with(&needle))
+            .unwrap_or_else(|| panic!("CSS custom property --{prop} not found"));
+        let raw = line.split(':').nth(1).unwrap();
+        let value = raw.split(';').next().unwrap().trim();
+        value
+            .strip_suffix("px")
+            .unwrap_or_else(|| panic!("--{prop} is not a px value: {line}"))
+            .trim()
+            .parse()
+            .unwrap_or_else(|_| panic!("--{prop} is not a px value: {line}"))
+    }
+
+    #[test]
+    fn native_window_sizes_cover_the_css_card_footprint() {
+        let rest = css_card_px("ov-rest-w");
+        let pill = css_card_px("ov-pill-w");
+        let work = css_card_px("ov-work-w");
+        let open = css_card_px("ov-open-w");
+        let base_h = css_card_px("ov-base-h");
+        let cap_h = css_card_px("ov-cap-max-h");
+
+        // Compact window fits every compact card state.
+        assert!(
+            OVERLAY_WIDTH >= rest && OVERLAY_WIDTH >= work,
+            "OVERLAY_WIDTH({OVERLAY_WIDTH}) must cover --ov-rest-w({rest}) and --ov-work-w({work})"
+        );
+        assert!(
+            OVERLAY_HEIGHT >= base_h,
+            "OVERLAY_HEIGHT({OVERLAY_HEIGHT}) must cover --ov-base-h({base_h})"
+        );
+        // Streaming window fits the open panel (row + text cap).
+        assert!(
+            OVERLAY_STREAM_WIDTH >= open,
+            "OVERLAY_STREAM_WIDTH({OVERLAY_STREAM_WIDTH}) must cover --ov-open-w({open})"
+        );
+        assert!(
+            OVERLAY_STREAM_HEIGHT >= base_h + cap_h,
+            "OVERLAY_STREAM_HEIGHT({OVERLAY_STREAM_HEIGHT}) must cover row + text cap ({base_h}+{cap_h})"
+        );
+        // sanity: the pill state sits between rest and open
+        assert!(rest <= pill && pill <= open);
+    }
 
     #[test]
     fn monitor_hit_test_uses_half_open_physical_bounds() {
