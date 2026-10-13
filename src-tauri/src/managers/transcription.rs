@@ -98,8 +98,12 @@ pub struct StreamRouter {
     preroll: Mutex<Vec<Vec<f32>>>,
 }
 
-/// Upper bound for the pre-roll buffer (2 s @ 16 kHz mono).
-const PREROLL_MAX_SAMPLES: usize = 16_000 * 2;
+/// Upper bound for the pre-roll buffer, derived from
+/// [`crate::remote_stream::CONNECT_TIMEOUT`]: a slow-but-successful handshake
+/// must never drop buffered speech — that path has no batch fallback, because
+/// the stream itself succeeds.
+const PREROLL_MAX_SAMPLES: usize =
+    16_000 * crate::remote_stream::CONNECT_TIMEOUT.as_secs() as usize;
 
 impl StreamRouter {
     fn new() -> Self {
@@ -230,6 +234,27 @@ impl TranscriptionManager {
     /// Whether a streaming session is open (feeding or awaiting finalize).
     pub fn is_streaming(&self) -> bool {
         self.router.is_open()
+    }
+
+    /// sttts: block until the staged WS connect from `start_stream` has
+    /// produced a session. A headless caller feeds a file much faster than the
+    /// connect completes — without this wait, `finalize_stream` races the
+    /// connect and sees no session. False when the connect failed (`open`
+    /// cleared) or after `timeout`.
+    pub fn wait_for_stream_session(&self, timeout: std::time::Duration) -> bool {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            if self.router.session.lock().unwrap().is_some() {
+                return true;
+            }
+            if !self.router.open.load(Ordering::Relaxed) {
+                return false;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
     }
 
     /// Signal end-of-audio and wait for the final transcript. `Ok(None)` when

@@ -28,7 +28,7 @@ use tokio_tungstenite::tungstenite::Message;
 /// giving up (the caller then falls back to batch transcription).
 const FINAL_TIMEOUT: Duration = Duration::from_secs(5);
 /// How long to wait for the WebSocket handshake.
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Deserialize)]
 struct StreamMessage {

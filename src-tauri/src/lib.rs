@@ -430,6 +430,11 @@ fn run_headless_transcription(app: &AppHandle, args: &CliArgs) -> i32 {
             let t = Instant::now();
             match tm.start_stream() {
                 Ok(()) => {
+                    // The WS connect is staged on a background thread (pre-roll
+                    // is meant for live mic frames); a file feeds far faster
+                    // than the connect completes, so wait for the session
+                    // instead of racing it.
+                    tm.wait_for_stream_session(std::time::Duration::from_secs(10));
                     // Feed in 100ms chunks as fast as the server accepts; the
                     // recognizer runs much faster than real time.
                     for chunk in samples.chunks(1_600) {
@@ -442,7 +447,17 @@ fn run_headless_transcription(app: &AppHandle, args: &CliArgs) -> i32 {
                                 managers::transcription::language_hint(&settings).as_deref(),
                             );
                         }
-                        Ok(None) => unreachable!("stream open but finalize returned None"),
+                        // Stream never came up (gateway down/timeout) — fall
+                        // back to the batch path for the whole file.
+                        Ok(None) => {
+                            text = match tm.transcribe(samples.clone()) {
+                                Ok(t) => t,
+                                Err(e) => {
+                                    eprintln!("error: batch fallback failed: {}", e);
+                                    return 1;
+                                }
+                            };
+                        }
                         Err(e) => {
                             eprintln!("error: stream finalize failed: {}", e);
                             return 1;
