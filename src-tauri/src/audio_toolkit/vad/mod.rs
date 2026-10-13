@@ -52,6 +52,16 @@ pub trait VoiceActivityDetector: Send + Sync {
         None
     }
 
+    /// sttts: samples the smoother is still withholding when the recording
+    /// ends (unconfirmed onset, expired hangover). A stop landing inside that
+    /// window would otherwise silently drop soft trailing speech — the final
+    /// words never reach the transcriber. Recording stop flushes these into
+    /// the pipeline and resets the smoothing state. Detectors without
+    /// buffering return an empty vec.
+    fn flush_tail(&mut self) -> Vec<f32> {
+        Vec::new()
+    }
+
     fn reset(&mut self) {}
 }
 

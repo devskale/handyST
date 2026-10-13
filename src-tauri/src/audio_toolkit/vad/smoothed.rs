@@ -153,6 +153,28 @@ impl VoiceActivityDetector for SmoothedVad {
         })
     }
 
+    /// sttts: hand back the trailing run of withheld frames (same window
+    /// tail_report counts) and reset the smoothing state. Interior unemitted
+    /// frames stay dropped — re-emitting them would land audio out of order
+    /// after already-emitted speech.
+    fn flush_tail(&mut self) -> Vec<f32> {
+        let mut tail = Vec::new();
+        for frame in self
+            .frame_buffer
+            .iter_mut()
+            .rev()
+            .take_while(|frame| !frame.emitted)
+        {
+            tail.extend_from_slice(&frame.samples);
+            frame.emitted = true;
+        }
+        tail.reverse(); // collect ran back-to-front; restore chronological order
+        self.in_speech = false;
+        self.hangover_counter = 0;
+        self.onset_counter = 0;
+        tail
+    }
+
     fn reset(&mut self) {
         self.inner_vad.reset();
         self.frame_buffer.clear();
@@ -233,5 +255,36 @@ mod tests {
         let report = vad.tail_report().unwrap();
         assert_eq!(report.withheld_frames, 2);
         assert_eq!(report.withheld_voiced_frames, 0);
+    }
+
+    #[test]
+    fn flush_tail_recovers_withheld_onset_in_order() {
+        // A stop before the onset confirms must not lose the trailing frames:
+        // flush hands back exactly the withheld window, chronologically.
+        let mut vad = smoothed(&[false, true], 2);
+        let _ = vad.push_frame(&frame(0.1)).unwrap(); // noise — withheld
+        let _ = vad.push_frame(&frame(0.9)).unwrap(); // onset 1/2 — withheld
+
+        let tail = vad.flush_tail();
+        assert_eq!(tail, vec![0.1, 0.1, 0.1, 0.1, 0.9, 0.9, 0.9, 0.9]);
+
+        // State is reset: the next frame starts from a clean slate.
+        assert!(!vad.push_frame(&frame(0.0)).unwrap().is_speech());
+        assert_eq!(vad.tail_report().unwrap().withheld_frames, 1);
+    }
+
+    #[test]
+    fn flush_tail_excludes_already_emitted_speech() {
+        // Speech emitted through hangover, then two withheld frames: the
+        // flush returns only the withheld run, never the emitted window.
+        let mut vad = smoothed(&[true, true, false, false, false, false], 2);
+        for v in [0.1, 0.2, 0.3, 0.4] {
+            let _ = vad.push_frame(&frame(v)).unwrap();
+        }
+        let _ = vad.push_frame(&frame(0.5)).unwrap(); // past hangover
+        let _ = vad.push_frame(&frame(0.6)).unwrap();
+
+        let tail = vad.flush_tail();
+        assert_eq!(tail, vec![0.5, 0.5, 0.5, 0.5, 0.6, 0.6, 0.6, 0.6]);
     }
 }

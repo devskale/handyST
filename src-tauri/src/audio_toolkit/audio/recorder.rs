@@ -962,6 +962,25 @@ impl CaptureProcessor {
                         report.hangover_counter
                     );
                 }
+
+                // sttts: stop flush — the smoother withholds trailing frames
+                // until an onset confirms or the hangover runs out; a stop
+                // landing inside that window silently dropped soft trailing
+                // speech ("die letzten Worte fehlen"). Push whatever is still
+                // buffered through the same emit path so the recording AND the
+                // live stream both see it.
+                let tail = cfg.detector.lock().unwrap().flush_tail();
+                if !tail.is_empty() {
+                    log::debug!(
+                        "VAD at stop: flushed {} withheld tail samples (~{}ms) into the recording",
+                        tail.len(),
+                        tail.len() * 1000 / constants::WHISPER_SAMPLE_RATE as usize
+                    );
+                    self.processed_samples.extend_from_slice(&tail);
+                    if let Some(cb) = &self.audio_cb {
+                        cb(&tail);
+                    }
+                }
             }
         }
 
