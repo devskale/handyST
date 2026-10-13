@@ -708,7 +708,9 @@
   },
   "overlay": {
     "transcribing": "Transkriberar...",
-    "processing": "Bearbetar..."
+    "processing": "Bearbetar...",
+    "dictate": "Diktera",
+    "dragTooltip": "Dra för att flytta"
   },
   "whatsNew": {
     "title": "Nytt i Handy v{{version}}"

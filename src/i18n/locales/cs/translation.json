@@ -708,7 +708,9 @@
   },
   "overlay": {
     "transcribing": "Přepisuji...",
-    "processing": "Zpracovávám..."
+    "processing": "Zpracovávám...",
+    "dictate": "Diktovat",
+    "dragTooltip": "Přetažením přesunete"
   },
   "whatsNew": {
     "title": "Novinky v Handy v{{version}}"

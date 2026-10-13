@@ -708,7 +708,9 @@
   },
   "overlay": {
     "transcribing": "Transkribiere...",
-    "processing": "Verarbeite..."
+    "processing": "Verarbeite...",
+    "dictate": "Diktieren",
+    "dragTooltip": "Zum Verschieben ziehen"
   },
   "whatsNew": {
     "title": "Neu in Handy v{{version}}"

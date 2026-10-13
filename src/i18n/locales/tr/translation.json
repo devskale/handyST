@@ -708,7 +708,9 @@
   },
   "overlay": {
     "transcribing": "Transkribe ediliyor...",
-    "processing": "İşleniyor..."
+    "processing": "İşleniyor...",
+    "dictate": "Dikte",
+    "dragTooltip": "Taşımak için sürükleyin"
   },
   "whatsNew": {
     "title": "Handy v{{version}} yenilikleri"

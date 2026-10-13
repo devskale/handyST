@@ -708,7 +708,9 @@
   },
   "overlay": {
     "transcribing": "Обробка...",
-    "processing": "Постобробка..."
+    "processing": "Постобробка...",
+    "dictate": "Диктувати",
+    "dragTooltip": "Перетягніть, щоб перемістити"
   },
   "whatsNew": {
     "title": "Нове в Handy v{{version}}"

@@ -708,7 +708,9 @@
   },
   "overlay": {
     "transcribing": "מתמלל...",
-    "processing": "מעבד..."
+    "processing": "מעבד...",
+    "dictate": "הכתבה",
+    "dragTooltip": "גרור כדי להזיז"
   },
   "whatsNew": {
     "title": "חדש ב-Handy v{{version}}"

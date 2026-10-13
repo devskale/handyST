@@ -253,7 +253,7 @@ const RecordingOverlay: React.FC = () => {
   const pillGrip = (
     <div
       className="pill-grip"
-      title="Ziehen zum Verschieben"
+      title={t("overlay.dragTooltip")}
       onPointerDown={pillDrag.onPointerDown}
     >
       <span />
@@ -381,8 +381,7 @@ const RecordingOverlay: React.FC = () => {
             <span className="sbase-l">
               <span className="sdot" />
             </span>
-            {/* eslint-disable-next-line i18next/no-literal-string -- action verb */}
-            <span className="swork-label">Dictate</span>
+            <span className="swork-label">{t("overlay.dictate")}</span>
             </button>
           </div>
         </div>
@@ -415,8 +414,7 @@ const RecordingOverlay: React.FC = () => {
                 />
               </svg>
             </span>
-            {/* eslint-disable-next-line i18next/no-literal-string -- action verb */}
-            <span className="swork-label">Dictate</span>
+            <span className="swork-label">{t("overlay.dictate")}</span>
           </button>
           </div>
         </div>

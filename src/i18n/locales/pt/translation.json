@@ -708,7 +708,9 @@
   },
   "overlay": {
     "transcribing": "Transcrevendo...",
-    "processing": "Processando..."
+    "processing": "Processando...",
+    "dictate": "Ditar",
+    "dragTooltip": "Arraste para mover"
   },
   "whatsNew": {
     "title": "Novidades no Handy v{{version}}"

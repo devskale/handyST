@@ -708,7 +708,9 @@
   },
   "overlay": {
     "transcribing": "正在轉錄...",
-    "processing": "處理中..."
+    "processing": "處理中...",
+    "dictate": "聽寫",
+    "dragTooltip": "拖曳以移動"
   },
   "whatsNew": {
     "title": "Handy v{{version}} 新功能"
