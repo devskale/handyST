@@ -39,8 +39,10 @@ fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
 }
 
 /// Live transcription snapshot emitted to the overlay during a streaming run.
-/// The remote stream has no committed/tentative split — the latest partial
-/// arrives as `tentative` with an empty `committed`.
+/// The remote stream sends whole-text partials (no deltas), so every partial
+/// arrives as `tentative` with an empty `committed` — `committed` is used
+/// exactly once per session, by `emit_stream_final`, to replace the bubble
+/// with the post-processed final.
 #[derive(Clone, Debug, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 pub struct StreamTextEvent {
     pub committed: String,
