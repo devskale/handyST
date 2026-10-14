@@ -720,7 +720,11 @@
     "processing": "İşleniyor...",
     "loadingModel": "Model yükleniyor...",
     "dictate": "Dikte",
-    "dragTooltip": "Taşımak için sürükleyin"
+    "dragTooltip": "Taşımak için sürükleyin",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı",
+    "close": "Kapat",
+    "emptyTranscript": "(transkripsiyon yok)"
   },
   "whatsNew": {
     "title": "Handy v{{version}} yenilikleri"

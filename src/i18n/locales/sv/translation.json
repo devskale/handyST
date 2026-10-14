@@ -720,7 +720,11 @@
     "processing": "Bearbetar...",
     "loadingModel": "Laddar modell...",
     "dictate": "Diktera",
-    "dragTooltip": "Dra för att flytta"
+    "dragTooltip": "Dra för att flytta",
+    "copy": "Kopiera",
+    "copied": "Kopierad",
+    "close": "Stäng",
+    "emptyTranscript": "(ingen transkription)"
   },
   "whatsNew": {
     "title": "Nytt i Handy v{{version}}"

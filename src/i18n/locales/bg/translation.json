@@ -720,7 +720,11 @@
     "processing": "Обработка...",
     "loadingModel": "Зареждане на модела...",
     "dictate": "Диктирай",
-    "dragTooltip": "Плъзнете, за да преместите"
+    "dragTooltip": "Плъзнете, за да преместите",
+    "copy": "Копирай",
+    "copied": "Копирано",
+    "close": "Затвори",
+    "emptyTranscript": "(няма транскрипция)"
   },
   "whatsNew": {
     "title": "Ново в Handy v{{version}}"

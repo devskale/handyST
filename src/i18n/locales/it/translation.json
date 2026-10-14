@@ -720,7 +720,11 @@
     "processing": "Elaborazione...",
     "loadingModel": "Caricamento del modello...",
     "dictate": "Dettare",
-    "dragTooltip": "Trascina per spostare"
+    "dragTooltip": "Trascina per spostare",
+    "copy": "Copia",
+    "copied": "Copiato",
+    "close": "Chiudi",
+    "emptyTranscript": "(nessuna trascrizione)"
   },
   "whatsNew": {
     "title": "Novità in Handy v{{version}}"

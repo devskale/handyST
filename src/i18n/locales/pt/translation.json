@@ -720,7 +720,11 @@
     "processing": "Processando...",
     "loadingModel": "Carregando modelo...",
     "dictate": "Ditar",
-    "dragTooltip": "Arraste para mover"
+    "dragTooltip": "Arraste para mover",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "close": "Fechar",
+    "emptyTranscript": "(sem transcrição)"
   },
   "whatsNew": {
     "title": "Novidades no Handy v{{version}}"

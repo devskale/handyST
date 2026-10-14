@@ -56,6 +56,8 @@
   --ov-work-w: 216px; /* working pill (transcribing / polishing) -- wide enough to
                          center longer labels; shared by Live (collapsed) + minimal */
   --ov-open-w: 392px; /* Live panel, expanded */
+  --ov-idle-w: 64px; /* idle pill at rest — dot only, original-pill sized */
+  --ov-idle-hover-w: 148px; /* idle pill on hover — label revealed */
   --ov-base-h: 40px; /* control-row height (.sbase) */
   --ov-cap-max-h: 64px; /* max height of the scrolling live-text region */
 }
@@ -504,11 +506,66 @@
   background: color-mix(in srgb, var(--color-text) 18%, transparent);
 }
 
-/* Complete pill: restart button after a finished dictation */
+/* Control row container for the compact pills (idle) */
 .pill-row {
   display: flex;
   align-items: center;
-  padding: 10px 14px 10px 10px;
+  padding: 6px 10px 6px 6px;
+}
+
+/* ---- Idle pill: small like the original pill (sttts). Dot only at rest;
+   hover expands to reveal the "Dictate" label. The whole pill is the button. */
+.scard.idle-card {
+  animation: none;
+  width: var(--ov-idle-w);
+  height: 36px;
+  border-radius: 999px;
+  overflow: hidden;
+  transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.idle-btn {
+  gap: 8px;
+  padding: 0 2px 0 4px;
+  min-width: 0;
+}
+.idle-btn .idle-label {
+  opacity: 0;
+  max-width: 0;
+  padding: 0;
+  transition:
+    opacity 180ms ease,
+    max-width 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 220ms ease;
+}
+.scard.idle-card:hover {
+  width: var(--ov-idle-hover-w);
+}
+.scard.idle-card:hover .idle-label {
+  opacity: 1;
+  max-width: 110px;
+  padding: 0 8px;
+}
+
+/* ---- Complete panel: final transcript + copy / dictate-again / close ---- */
+.scard.complete {
+  animation: none; /* arrives from the streaming card, not from zero */
+}
+.complete .stext-cap {
+  -webkit-mask-image: none;
+  mask-image: none;
+  padding-bottom: 10px;
+}
+.complete .stext-cap .committed {
+  color: var(--color-text);
+  -webkit-user-select: text;
+  user-select: text;
+}
+.complete-again {
+  justify-self: start;
+}
+.complete-copy.ok {
+  background: var(--s-accent-soft);
+  color: var(--color-text);
 }
 
 .pill-grip {

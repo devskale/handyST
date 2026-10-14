@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { availableMonitors } from "@tauri-apps/api/window";
 import { PhysicalPosition } from "@tauri-apps/api/dpi";
@@ -66,6 +67,8 @@ const RecordingOverlay: React.FC = () => {
   // Bumped on each new streaming session so the Live card remounts fresh (replays
   // the pop-in, and never animates in from the previous panel's open size).
   const [session, setSession] = useState(0);
+  // Complete panel: transient check-mark after copying the transcript.
+  const [copied, setCopied] = useState(false);
   // Overlay placement (top vs bottom of the screen). The Live panel grows downward
   // from a top overlay (oldest line under the pill) and upward from a bottom one.
   const [position, setPosition] = useState<"top" | "bottom">("bottom");
@@ -248,14 +251,14 @@ const RecordingOverlay: React.FC = () => {
     setOverflowing(false);
   }, [session]);
 
-  // The complete pill lingers a few seconds with a "Dictate again" button,
-  // then fades on its own — and hands over to the persistent idle pill.
+  // The complete panel keeps the transcript for copy/edit; after a minute
+  // without interaction it hands over to the persistent idle pill.
   useEffect(() => {
     if (state !== "complete" || !isVisible) return;
     const id = setTimeout(() => {
       commands.showIdlePillIfEnabled();
       setIsVisible(false);
-    }, 5000);
+    }, 60_000);
     return () => clearTimeout(id);
   }, [state, isVisible, session]);
 
@@ -427,27 +430,31 @@ const RecordingOverlay: React.FC = () => {
     );
   }
 
-  // ---- Idle pill: persistent, click to dictate (sttts) ----
+  // ---- Idle pill: persistent, click to dictate (sttts). Small like the
+  // original pill — dot only; expands on hover to reveal the label.
   if (state === "idle") {
     return (
       <div
         dir={direction}
         className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
       >
-        <div className="scard compact">
+        <div className="scard idle-card">
           <div className="pill-row">
             {pillGrip}
             <button
-              className="sbase again-btn"
-            onClick={() => {
-              setIsVisible(false);
-              commands.toggleDictation();
-            }}
-          >
-            <span className="sbase-l">
-              <span className="sdot" />
-            </span>
-            <span className="swork-label">{t("overlay.dictate")}</span>
+              className="again-btn idle-btn"
+              title={t("overlay.dictate")}
+              onClick={() => {
+                setIsVisible(false);
+                commands.toggleDictation();
+              }}
+            >
+              <span className="sbase-l">
+                <span className="sdot ready" />
+              </span>
+              <span className="swork-label idle-label">
+                {t("overlay.dictate")}
+              </span>
             </button>
           </div>
         </div>
@@ -455,33 +462,107 @@ const RecordingOverlay: React.FC = () => {
     );
   }
 
-  // ---- Complete pill: "Dictate again" after a finished dictation ----
+  // ---- Complete panel: the final transcript stays visible for copy/edit —
+  // no more five-second disappearance into the idle pill (sttts). Close (X)
+  // hands over to the idle pill; auto after a minute (see effect above).
   if (state === "complete") {
+    const transcript = (streamText.committed || streamText.tentative).trim();
     return (
-      <div
-        dir={direction}
-        className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
-      >
-        <div className="scard compact cworking">
-          <div className="pill-row">
-          {pillGrip}
-          <button
-            className="sbase again-btn"
-            onClick={() => {
-              setIsVisible(false);
-              commands.toggleDictation();
-            }}
-          >
-            <span className="sbase-l">
+      <div dir={direction} className={`ov-stage ${position}`}>
+        <div key={session} className="scard open complete">
+          <div className="stext">
+            <div className="stext-clip">
+              <div className="stext-cap">
+                <p>
+                  <span className="committed">
+                    {transcript || t("overlay.emptyTranscript")}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="sbase">
+            {pillGrip}
+            <button
+              className={`sx complete-copy ${copied ? "ok" : ""}`}
+              aria-label={copied ? t("overlay.copied") : t("overlay.copy")}
+              title={copied ? t("overlay.copied") : t("overlay.copy")}
+              disabled={!transcript}
+              onClick={() => {
+                void writeText(transcript).then(() => {
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1400);
+                });
+              }}
+            >
+              {copied ? (
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path
+                    d="M3 8.5 6.5 12 13 4.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <rect
+                    x="5.5"
+                    y="5.5"
+                    width="8"
+                    height="8"
+                    rx="1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                  />
+                  <path
+                    d="M10.5 3.5v-1a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                  />
+                </svg>
+              )}
+            </button>
+            <button
+              className="again-btn complete-again"
+              title={t("overlay.dictate")}
+              onClick={() => {
+                setIsVisible(false);
+                commands.toggleDictation();
+              }}
+            >
               <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
                 <path
                   d="M8 2a6 6 0 1 1-5.66 4H4.2A4.6 4.6 0 1 0 8 3.4V6L4.5 3 8 0v2z"
                   fill="currentColor"
                 />
               </svg>
-            </span>
-            <span className="swork-label">{t("overlay.dictate")}</span>
-          </button>
+              <span className="swork-label">{t("overlay.dictate")}</span>
+            </button>
+            <div className="sbase-r">
+              <button
+                className="sx"
+                aria-label={t("overlay.close")}
+                title={t("overlay.close")}
+                onClick={() => {
+                  setIsVisible(false);
+                  commands.showIdlePillIfEnabled();
+                }}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path
+                    d="M4 4 L12 12 M12 4 L4 12"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -612,7 +693,26 @@ function usePillDrag() {
           if (clX !== pos.x || clY !== pos.y) {
             await win.setPosition(new PhysicalPosition(clX, clY));
           }
-          await commands.setOverlayPillPosition(clX / scale, clY / scale);
+          // Persist the ANCHOR, not the top-left: x = card center, y = the
+          // screen-edge Y (bottom edge for a bottom overlay, top edge for a
+          // top one). The backend re-derives each state's window position
+          // from the anchor, so the pill stays put while the window resizes
+          // between idle/recording/streaming/complete.
+          const anchorX = (clX + size.width / 2) / scale;
+          let placement: "top" | "bottom" = "bottom";
+          try {
+            const s = await commands.getAppSettings();
+            if (s.status === "ok" && s.data.overlay_position === "top") {
+              placement = "top";
+            }
+          } catch {
+            /* default to bottom placement */
+          }
+          const anchorY =
+            placement === "bottom"
+              ? (clY + size.height) / scale
+              : clY / scale;
+          await commands.setOverlayPillPosition(anchorX, anchorY);
           void commands.setOverlayPillDragging(false);
         }
       } catch {

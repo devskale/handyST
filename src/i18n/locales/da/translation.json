@@ -723,7 +723,11 @@
     "processing": "Behandler...",
     "loadingModel": "Indlæser model...",
     "dictate": "Dikter",
-    "dragTooltip": "Træk for at flytte"
+    "dragTooltip": "Træk for at flytte",
+    "copy": "Kopiér",
+    "copied": "Kopieret",
+    "close": "Luk",
+    "emptyTranscript": "(ingen transskription)"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} blokerer muligvis 1 genvej",

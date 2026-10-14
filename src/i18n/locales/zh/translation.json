@@ -720,7 +720,11 @@
     "processing": "处理中...",
     "loadingModel": "正在加载模型...",
     "dictate": "听写",
-    "dragTooltip": "拖动以移动"
+    "dragTooltip": "拖动以移动",
+    "copy": "复制",
+    "copied": "已复制",
+    "close": "关闭",
+    "emptyTranscript": "(无转录文本)"
   },
   "whatsNew": {
     "title": "Handy v{{version}} 新功能"

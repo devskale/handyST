@@ -473,9 +473,17 @@ pub struct AppSettings {
     #[serde(default)]
     pub dictation_shortcut: String,
     /// sttts: saved pill position once the user dragged the pill; overrides
-    /// the centered top/bottom placement.
+    /// the centered top/bottom placement. Legacy top-left semantics — the
+    /// anchor below supersedes it (migration converts once).
     #[serde(default)]
     pub overlay_pill_pos: Option<PillPosition>,
+    /// sttts: pill anchor in logical points — horizontal CENTER of the card
+    /// plus the screen-edge Y (bottom edge for a bottom overlay, top edge for
+    /// a top overlay). Anchoring (instead of a window top-left) is what keeps
+    /// the pill in place while the window changes size between idle/recording
+    /// /streaming states — the card grows from its anchor instead of jumping.
+    #[serde(default)]
+    pub overlay_pill_anchor: Option<PillPosition>,
     /// Stop recording automatically after this much VAD silence following
     /// speech (ms). 0 = off. Requires Voice Activity Detection.
     #[serde(default)]
@@ -1035,6 +1043,7 @@ pub fn get_default_settings() -> AppSettings {
         favorite_languages: default_favorite_languages(),
         dictation_shortcut: "none".to_string(),
         overlay_pill_pos: None,
+        overlay_pill_anchor: None,
         auto_stop_silence_ms: 0,
         vad_backend: VadBackend::default(),
         overlay_idle_pill: default_overlay_idle_pill(),

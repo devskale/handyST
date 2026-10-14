@@ -720,7 +720,11 @@
     "processing": "처리 중...",
     "loadingModel": "모델 로딩 중...",
     "dictate": "받아쓰기",
-    "dragTooltip": "드래그하여 이동"
+    "dragTooltip": "드래그하여 이동",
+    "copy": "복사",
+    "copied": "복사됨",
+    "close": "닫기",
+    "emptyTranscript": "(변환 없음)"
   },
   "whatsNew": {
     "title": "Handy v{{version}}의 새 소식"

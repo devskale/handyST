@@ -723,7 +723,11 @@
     "processing": "Verwerken...",
     "loadingModel": "Model laden...",
     "dictate": "Dicteren",
-    "dragTooltip": "Slepen om te verplaatsen"
+    "dragTooltip": "Slepen om te verplaatsen",
+    "copy": "Kopiëren",
+    "copied": "Gekopieerd",
+    "close": "Sluiten",
+    "emptyTranscript": "(geen transcriptie)"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} blokkeert mogelijk 1 sneltoets",

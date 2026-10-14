@@ -720,7 +720,11 @@
     "processing": "جاري المعالجة...",
     "loadingModel": "جارٍ تحميل النموذج...",
     "dictate": "إملاء",
-    "dragTooltip": "اسحب للتحريك"
+    "dragTooltip": "اسحب للتحريك",
+    "copy": "نسخ",
+    "copied": "تم النسخ",
+    "close": "إغلاق",
+    "emptyTranscript": "(لا تفريغ نصي)"
   },
   "whatsNew": {
     "title": "الجديد في Handy v{{version}}"

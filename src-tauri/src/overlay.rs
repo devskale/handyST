@@ -53,9 +53,12 @@ const OVERLAY_HEIGHT: f64 = 64.0;
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 170.0;
 
-/// Overlay window size (logical) for a given UI state.
+/// Overlay window size (logical) for a given UI state. The complete state
+/// reuses the streaming panel size — it shows the final transcript in the
+/// open card (copy / dictate-again / close) instead of the old compact
+/// "Dictate" pill.
 fn overlay_dimensions(state: &str) -> (f64, f64) {
-    if state == "streaming" {
+    if matches!(state, "streaming" | "complete") {
         (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
     } else {
         (OVERLAY_WIDTH, OVERLAY_HEIGHT)
@@ -544,17 +547,22 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
             let pos_started = std::time::Instant::now();
             #[cfg(not(target_os = "windows"))]
             let set_pos_elapsed =
-                // sttts: a user-dragged pill position wins over the centered
-                // top/bottom placement — unless the user is dragging right now.
+                // sttts: a user-dragged pill ANCHOR wins over the centered
+                // top/bottom placement — unless the user is dragging right
+                // now. The anchor places every state's card at the same
+                // on-screen point (center + screen edge), so idle → streaming
+                // morphs in place instead of jumping.
                 if pill_dragging() {
                     std::time::Duration::ZERO
-                } else if let Some((x, y)) = saved_pill_position(app_handle)
-                    .or_else(|| calculate_overlay_position(app_handle, width, height))
+                } else if let Some((ax, ay)) = saved_pill_anchor(app_handle) {
+                    let (x, y) = anchor_to_top_left(app_handle, ax, ay, width, height);
+                    let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
+                    let set_pos_started = std::time::Instant::now();
+                    let _ = overlay_window
+                        .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+                    set_pos_started.elapsed()
+                } else if let Some((x, y)) = calculate_overlay_position(app_handle, width, height)
                 {
-                    // State-aware clamp: the streaming panel is wider than
-                    // the idle card, so a saved idle position at the right
-                    // edge would clip it — pull the window fully on-screen
-                    // for THIS state's size.
                     let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
                     let set_pos_started = std::time::Instant::now();
                     let _ = overlay_window
@@ -596,8 +604,12 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
             // saved 1250 clamped to 1214, the card still rendered at ~1342,
             // clipped off the right edge). The post-show move applies.
             if !pill_dragging() {
-                if let Some((x, y)) = saved_pill_position(app_handle)
-                    .or_else(|| calculate_overlay_position(app_handle, width, height))
+                if let Some((ax, ay)) = saved_pill_anchor(app_handle) {
+                    let (x, y) = anchor_to_top_left(app_handle, ax, ay, width, height);
+                    let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
+                    let _ = overlay_window
+                        .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+                } else if let Some((x, y)) = calculate_overlay_position(app_handle, width, height)
                 {
                     let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
                     let _ = overlay_window
@@ -705,11 +717,15 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
             // overlay is in compact or streaming layout.
             let (width, height) = current_overlay_logical_size(&overlay_window)
                 .unwrap_or((OVERLAY_WIDTH, OVERLAY_HEIGHT));
-            // sttts: a user-dragged pill position wins over the centered
-            // top/bottom placement — unless the user is dragging right now.
+            // sttts: the anchor keeps every state's card at the same point.
             if !pill_dragging() {
-                if let Some((x, y)) = saved_pill_position(app_handle)
-                    .or_else(|| calculate_overlay_position(app_handle, width, height))
+                if let Some((ax, ay)) = saved_pill_anchor(app_handle) {
+                    let (x, y) = anchor_to_top_left(app_handle, ax, ay, width, height);
+                    let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
+                    let _ = overlay_window
+                        .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+                } else if let Some((x, y)) =
+                    calculate_overlay_position(app_handle, width, height)
                 {
                     let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
                     let _ = overlay_window
@@ -788,6 +804,7 @@ pub fn run_pill_test(app_handle: &AppHandle) {
         let _ = handle.run_on_main_thread(move || {
             let mut st = crate::settings::get_settings(&h0);
             st.overlay_pill_pos = None;
+            st.overlay_pill_anchor = None;
             crate::settings::write_settings(&h0, st);
         });
         std::thread::sleep(std::time::Duration::from_millis(200));
@@ -826,7 +843,7 @@ pub fn run_pill_test(app_handle: &AppHandle) {
             // persisted settings round-trip plus visibility; the actual frame
             // is verified externally (System Events / screenshot).
             let moved = crate::settings::get_settings(&handle)
-                .overlay_pill_pos
+                .overlay_pill_anchor
                 .map(|p| (p.x - tx).abs() < 2.0 && (p.y - ty).abs() < 2.0)
                 .unwrap_or(false)
                 && visible();
@@ -837,7 +854,7 @@ pub fn run_pill_test(app_handle: &AppHandle) {
             on_main(Box::new(move || show_overlay_state(&h3, "idle")));
             std::thread::sleep(std::time::Duration::from_millis(400));
             let restored = crate::settings::get_settings(&handle)
-                .overlay_pill_pos
+                .overlay_pill_anchor
                 .map(|p| (p.x - tx).abs() < 2.0 && (p.y - ty).abs() < 2.0)
                 .unwrap_or(false)
                 && visible();
@@ -856,13 +873,14 @@ pub fn run_pill_test(app_handle: &AppHandle) {
             let h6 = handle.clone();
             let (tx2, rx2) = std::sync::mpsc::channel::<Option<(f64, f64)>>();
             let _ = handle.run_on_main_thread(move || {
-                let _ = tx2.send(Some(clamp_to_monitor(&h6, tx, ty, 400.0, 170.0)));
+                let (wx, wy) = anchor_to_top_left(&h6, tx, ty, 400.0, 170.0);
+                let _ = tx2.send(Some(clamp_to_monitor(&h6, wx, wy, 400.0, 170.0)));
             });
             let clamped = rx2
                 .recv_timeout(std::time::Duration::from_secs(3))
                 .ok()
                 .flatten();
-            let saved = crate::settings::get_settings(&handle).overlay_pill_pos;
+            let saved = crate::settings::get_settings(&handle).overlay_pill_anchor;
             let vis = visible();
             // Display-independent assertion: the clamped 400x170 spot must
             // fit fully inside SOME monitor (with the menu-bar reserve).
@@ -916,7 +934,7 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                 1400.0,
                 10.0,
             );
-            let dead_rejected = effective_saved_pill_position(&handle)
+            let dead_rejected = saved_pill_anchor(&handle)
                 .map(|p| (p.0 - 1400.0).abs() > 1.0 || (p.1 - 10.0).abs() > 1.0)
                 .unwrap_or(true);
             results.insert(
@@ -929,7 +947,7 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                 1250.0,
                 40.0,
             );
-            let valid_accepted = effective_saved_pill_position(&handle)
+            let valid_accepted = saved_pill_anchor(&handle)
                 .map(|p| (p.0 - 1250.0).abs() <= 1.0 && (p.1 - 40.0).abs() <= 1.0)
                 .unwrap_or(false);
             results.insert(
@@ -991,10 +1009,10 @@ fn pill_dragging() -> bool {
     PILL_DRAG_ACTIVE.load(Ordering::SeqCst)
 }
 
-/// sttts: a saved pill position is only used when it still lands on a known
+/// sttts: a saved pill ANCHOR is only used when it still lands on a known
 /// monitor (logical coordinates). Guards against stale/garbage values
 /// parking the pill off-screen (e.g. top-left after a display change).
-fn pill_pos_on_any_monitor(app_handle: &AppHandle, x: f64, y: f64) -> bool {
+fn pill_anchor_on_any_monitor(app_handle: &AppHandle, x: f64, y: f64) -> bool {
     let Ok(monitors) = app_handle.available_monitors() else {
         return false;
     };
@@ -1004,22 +1022,65 @@ fn pill_pos_on_any_monitor(app_handle: &AppHandle, x: f64, y: f64) -> bool {
         let my = m.position().y as f64 / scale;
         let mw = m.size().width as f64 / scale;
         let mh = m.size().height as f64 / scale;
-        // The visible CARD (172 px, centered with ~42 px inset in the 256 px
-        // window) must stay on THIS monitor — the invisible window margin may
-        // overhang the edges. The top keeps a menu-bar reserve: the pill is
-        // a status-level panel and would otherwise slide behind it and
-        // "slowly disappear", especially top-right.
-        x >= mx - 42.0
+        // The widest card (streaming panel, --ov-open-w 392 px, rounded up)
+        // must fit around the anchor on THIS monitor, with the menu-bar
+        // reserve at the top — the pill is a status-level panel and would
+        // otherwise slide behind it, especially top-right.
+        const HALF_CARD: f64 = 200.0;
+        x - HALF_CARD >= mx
+            && x + HALF_CARD <= mx + mw
             && y >= my + 28.0
-            && x + OVERLAY_WIDTH - 42.0 <= mx + mw
-            && y + OVERLAY_HEIGHT <= my + mh
+            && y <= my + mh - 8.0
     })
 }
 
-/// The saved position after the on-screen guard ran — what a show actually
-/// applies. Exposed for the --pill-test probes.
-pub fn effective_saved_pill_position(app_handle: &AppHandle) -> Option<(f64, f64)> {
-    saved_pill_position(app_handle)
+/// The saved anchor (card center X + screen-edge Y) in logical points, after
+/// the on-screen guard ran — what a show actually anchors to. Migrates the
+/// legacy `overlay_pill_pos` top-left value once: the legacy position was
+/// captured with the idle window size, so the anchor is its center/bottom.
+pub fn saved_pill_anchor(app_handle: &AppHandle) -> Option<(f64, f64)> {
+    let settings = settings::get_settings(app_handle);
+    if let Some(a) = settings.overlay_pill_anchor {
+        let pos = pill_anchor_on_any_monitor(app_handle, a.x, a.y);
+        return if pos { Some((a.x, a.y)) } else { None };
+    }
+    // One-time migration from the legacy top-left field.
+    let legacy = settings.overlay_pill_pos?;
+    let anchor = match settings.overlay_position {
+        OverlayPosition::Top => (legacy.x + OVERLAY_WIDTH / 2.0, legacy.y),
+        OverlayPosition::Bottom => (legacy.x + OVERLAY_WIDTH / 2.0, legacy.y + OVERLAY_HEIGHT),
+    };
+    if !pill_anchor_on_any_monitor(app_handle, anchor.0, anchor.1) {
+        return None;
+    }
+    let mut st = settings;
+    st.overlay_pill_anchor = Some(crate::settings::PillPosition {
+        x: anchor.0,
+        y: anchor.1,
+    });
+    crate::settings::write_settings(app_handle, st);
+    Some(anchor)
+}
+
+/// Window top-left (logical) that places the card of `width`×`height` at the
+/// saved anchor: horizontally centered on the anchor's X, vertically flush
+/// with the anchor's Y (bottom edge for a bottom overlay, top edge for a top
+/// one). This is the position continuity fix: every state anchors the same
+/// card point, so idle → streaming morphs in place instead of jumping.
+fn anchor_to_top_left(
+    app_handle: &AppHandle,
+    ax: f64,
+    ay: f64,
+    width: f64,
+    height: f64,
+) -> (f64, f64) {
+    let bottom = matches!(
+        settings::get_settings(app_handle).overlay_position,
+        OverlayPosition::Bottom
+    );
+    let x = ax - width / 2.0;
+    let y = if bottom { ay - height } else { ay };
+    (x, y)
 }
 
 /// sttts: clamp a target position so the window of `width`x`height` lies
@@ -1099,12 +1160,6 @@ fn clamp_to_monitor(
     )
 }
 
-fn saved_pill_position(app_handle: &AppHandle) -> Option<(f64, f64)> {
-    settings::get_settings(app_handle)
-        .overlay_pill_pos
-        .filter(|p| pill_pos_on_any_monitor(app_handle, p.x, p.y))
-        .map(|p| (p.x, p.y))
-}
 
 /// Generation counter bumped every time the overlay is shown. The delayed
 /// `hide()` below only unmaps the window if no show happened after it was

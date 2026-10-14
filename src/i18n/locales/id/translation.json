@@ -723,7 +723,11 @@
     "processing": "Memproses...",
     "loadingModel": "Memuat model...",
     "dictate": "Dikte",
-    "dragTooltip": "Seret untuk memindahkan"
+    "dragTooltip": "Seret untuk memindahkan",
+    "copy": "Salin",
+    "copied": "Tersalin",
+    "close": "Tutup",
+    "emptyTranscript": "(tanpa transkripsi)"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} mungkin memblokir 1 pintasan",

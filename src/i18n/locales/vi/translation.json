@@ -720,7 +720,11 @@
     "processing": "Đang xử lý...",
     "loadingModel": "Đang tải mô hình...",
     "dictate": "Đọc chính tả",
-    "dragTooltip": "Kéo để di chuyển"
+    "dragTooltip": "Kéo để di chuyển",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "close": "Đóng",
+    "emptyTranscript": "(không có bản ghi)"
   },
   "whatsNew": {
     "title": "Điểm mới trong Handy v{{version}}"

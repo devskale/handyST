@@ -720,7 +720,11 @@
     "processing": "Zpracovávám...",
     "loadingModel": "Načítání modelu...",
     "dictate": "Diktovat",
-    "dragTooltip": "Přetažením přesunete"
+    "dragTooltip": "Přetažením přesunete",
+    "copy": "Kopírovat",
+    "copied": "Zkopírováno",
+    "close": "Zavřít",
+    "emptyTranscript": "(žádný přepis)"
   },
   "whatsNew": {
     "title": "Novinky v Handy v{{version}}"

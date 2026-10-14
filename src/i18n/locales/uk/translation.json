@@ -720,7 +720,11 @@
     "processing": "Постобробка...",
     "loadingModel": "Завантаження моделі...",
     "dictate": "Диктувати",
-    "dragTooltip": "Перетягніть, щоб перемістити"
+    "dragTooltip": "Перетягніть, щоб перемістити",
+    "copy": "Копіювати",
+    "copied": "Скопійовано",
+    "close": "Закрити",
+    "emptyTranscript": "(немає транскрипції)"
   },
   "whatsNew": {
     "title": "Нове в Handy v{{version}}"

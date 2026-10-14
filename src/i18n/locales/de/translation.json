@@ -720,7 +720,11 @@
     "processing": "Verarbeite...",
     "loadingModel": "Modell wird geladen...",
     "dictate": "Diktieren",
-    "dragTooltip": "Zum Verschieben ziehen"
+    "dragTooltip": "Zum Verschieben ziehen",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "close": "Schließen",
+    "emptyTranscript": "(keine Transkription)"
   },
   "whatsNew": {
     "title": "Neu in Handy v{{version}}"

@@ -720,7 +720,11 @@
     "processing": "מעבד...",
     "loadingModel": "טוען מודל...",
     "dictate": "הכתבה",
-    "dragTooltip": "גרור כדי להזיז"
+    "dragTooltip": "גרור כדי להזיז",
+    "copy": "העתק",
+    "copied": "הועתק",
+    "close": "סגור",
+    "emptyTranscript": "(אין תמליל)"
   },
   "whatsNew": {
     "title": "חדש ב-Handy v{{version}}"

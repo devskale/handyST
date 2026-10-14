@@ -1490,13 +1490,16 @@ pub fn set_overlay_pill_dragging(active: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// sttts: persist the user-dragged pill position (logical coordinates) from
-/// the overlay window's drag handler.
+/// sttts: persist the user-dragged pill ANCHOR (logical coordinates):
+/// x = horizontal center of the card, y = screen-edge Y (bottom edge for a
+/// bottom overlay, top edge for a top overlay). Sent from the overlay
+/// window's drag handler. Anchoring keeps the pill put while the window
+/// resizes between idle/recording/streaming states.
 #[tauri::command]
 #[specta::specta]
 pub fn set_overlay_pill_position(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
-    settings.overlay_pill_pos = Some(settings::PillPosition { x, y });
+    settings.overlay_pill_anchor = Some(settings::PillPosition { x, y });
     settings::write_settings(&app, settings);
     Ok(())
 }

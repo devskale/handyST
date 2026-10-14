@@ -723,7 +723,11 @@
     "processing": "S'està processant...",
     "loadingModel": "S'està carregant el model...",
     "dictate": "Dicta",
-    "dragTooltip": "Arrossega per moure"
+    "dragTooltip": "Arrossega per moure",
+    "copy": "Copia",
+    "copied": "Copiat",
+    "close": "Tanca",
+    "emptyTranscript": "(sense transcripció)"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} pot estar blocant 1 drecera",

@@ -720,7 +720,11 @@
     "processing": "処理中…",
     "loadingModel": "モデルを読み込み中…",
     "dictate": "ディクテーション",
-    "dragTooltip": "ドラッグで移動"
+    "dragTooltip": "ドラッグで移動",
+    "copy": "コピー",
+    "copied": "コピーしました",
+    "close": "閉じる",
+    "emptyTranscript": "(文字起こしなし)"
   },
   "whatsNew": {
     "title": "Handy v{{version}} の新機能"
