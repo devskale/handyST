@@ -55,23 +55,30 @@ export const ShortcutBehaviorSelector: React.FC<
       layout="horizontal"
       grouped={grouped}
     >
-      <div className="flex gap-1 p-1 rounded-lg border border-mid-gray/20 bg-mid-gray/5">
-        {modes.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            title={m.title}
-            disabled={disabled}
-            onClick={m.onClick}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              m.active
-                ? "bg-background border border-logo-primary/40 text-text shadow-sm"
-                : "border border-transparent text-mid-gray hover:text-text hover:bg-background-ui/40"
-            } ${disabled ? "opacity-50 cursor-default" : "cursor-pointer"}`}
-          >
-            {m.label}
-          </button>
-        ))}
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex gap-1 p-1 rounded-lg border border-mid-gray/20 bg-mid-gray/5">
+          {modes.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              title={m.title}
+              disabled={disabled}
+              onClick={m.onClick}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                m.active
+                  ? "bg-background border border-logo-primary/40 text-text shadow-sm"
+                  : "border border-transparent text-mid-gray hover:text-text hover:bg-background-ui/40"
+              } ${disabled ? "opacity-50 cursor-default" : "cursor-pointer"}`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {/* The labels alone ("Auto") are cryptic — show what the active mode
+            does instead of hiding it behind the hover tooltip. */}
+        <span className="text-[11px] leading-tight text-mid-gray max-w-[220px] text-right">
+          {modes.find((m) => m.active)?.title}
+        </span>
       </div>
     </SettingContainer>
   );
