@@ -16,7 +16,8 @@
     "postProcessing": "पोस्ट प्रोसेस",
     "history": "हिस्ट्री",
     "debug": "डिबग",
-    "about": "बारेमा"
+    "about": "बारेमा",
+    "remoteTranscription": "Remote Transcription"
   },
   "onboarding": {
     "subtitle": "सुरु गर्न, एउटा ट्रान्सक्रिप्सन मोडेल छान्नुहोस्",
@@ -207,6 +208,42 @@
           "push_to_talk": "सर्टकट थिचिराखेसम्म रेकर्ड गर्छ",
           "toggle": "रेकर्डिङ सुरु गर्न सर्टकट ट्याप गर्नुहोस्, रोक्न फेरि ट्याप गर्नुहोस्"
         }
+      },
+      "dictationShortcut": {
+        "label": "Second trigger",
+        "description": "A second way to start/stop dictation (mic key or double-tap). The Dictation key above keeps working",
+        "options": {
+          "none": "None",
+          "micKey": "Mic key (F5 position)",
+          "ctrlDouble": "Press Control key twice",
+          "globeDouble": "Press Globe/Fn key twice",
+          "cmdLeftDouble": "Press left ⌘ twice",
+          "cmdRightDouble": "Press right ⌘ twice",
+          "optLeftDouble": "Press left ⌥ twice",
+          "optRightDouble": "Press right ⌥ twice"
+        }
+      },
+      "favoriteLanguages": {
+        "label": "Overlay language chips",
+        "description": "Languages offered by the switcher in the recording overlay (comma-separated)"
+      },
+      "shortcutBehavior": {
+        "title": "Shortcut behavior",
+        "description": "How the Dictation key starts and stops recording",
+        "options": {
+          "auto": "Auto",
+          "hold": "Hold",
+          "toggle": "Toggle"
+        },
+        "descriptions": {
+          "hold_or_toggle": "Hold to record, or tap to keep recording until the next tap",
+          "push_to_talk": "Records while you hold the key",
+          "toggle": "Tap to start, tap again to stop"
+        }
+      },
+      "idlePill": {
+        "label": "Persistent dictation pill",
+        "description": "Keep a small Dictate button on screen while idle — click it to start without the keyboard"
       }
     },
     "models": {
@@ -407,6 +444,14 @@
           "simplified": "सरलीकृत",
           "traditional": "परम्परागत"
         }
+      },
+      "recordingBuffer": {
+        "title": "Trailing recording buffer",
+        "description": "Keep recording this long after you stop, so last words still land. 0 = off."
+      },
+      "autoStopSilence": {
+        "title": "Auto-stop on silence",
+        "description": "End the recording after this much silence following speech (like macOS dictation). Requires Voice Activity Detection; applies from the next recording."
       }
     },
     "postProcessing": {
@@ -654,6 +699,39 @@
           "details": "Handy को स्थानीय स्पिच-टु-टेक्स्ट transcribe.cpp र ggml मा आधारित छ। Georgi Gerganov र योगदानकर्ताहरूको उत्कृष्ट कामका लागि धन्यवाद।"
         }
       }
+    },
+    "remoteTranscription": {
+      "title": "Remote Transcription",
+      "enabled": {
+        "label": "Use remote transcription",
+        "description": "Send recordings to an OpenAI-compatible /v1/audio/transcriptions endpoint instead of local models."
+      },
+      "baseUrl": {
+        "label": "Base URL",
+        "description": "Root URL of the gateway, e.g. http://dgxp:3001."
+      },
+      "model": {
+        "label": "Model",
+        "description": "Model name passed in the multipart request."
+      },
+      "apiKey": {
+        "label": "API Key",
+        "description": "Bearer token, stored in the macOS Keychain."
+      },
+      "check": {
+        "title": "Status",
+        "description": "Checks the gateway and whether the transcription and speech models are up.",
+        "button": "Check again",
+        "running": "Checking…",
+        "summaryOk": "Everything is up.",
+        "summaryFail": "Not everything is reachable.",
+        "components": {
+          "gateway": "Gateway",
+          "models": "Models",
+          "stt": "Transcription (STT)",
+          "tts": "Speech (TTS)"
+        }
+      }
     }
   },
   "footer": {
@@ -727,7 +805,9 @@
     "copy": "कपी",
     "copied": "कपी भयो",
     "close": "बन्द",
-    "emptyTranscript": "(कुनै ट्रान्सक्रिप्सन छैन)"
+    "emptyTranscript": "(कुनै ट्रान्सक्रिप्सन छैन)",
+    "languageAutoTooltip": "Automatic language detection",
+    "languageForceTooltip": "Force {{lang}} (next recording)"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} ले 1 सर्टकट रोकिरहेको हुन सक्छ",
