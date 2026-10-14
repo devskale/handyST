@@ -925,24 +925,14 @@ pub fn run(cli_args: CliArgs) {
         })
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
-                api.prevent_close();
-                let _res = window.hide();
-
-                #[cfg(target_os = "macos")]
-                {
-                    let settings = get_settings(window.app_handle());
-                    let tray_visible =
-                        settings.show_tray_icon && !window.app_handle().state::<CliArgs>().no_tray;
-                    if tray_visible {
-                        // Tray is available: hide the dock icon, app lives in the tray
-                        let res = window
-                            .app_handle()
-                            .set_activation_policy(tauri::ActivationPolicy::Accessory);
-                        if let Err(e) = res {
-                            log::error!("Failed to set activation policy: {}", e);
-                        }
-                    }
-                    // No tray: keep the dock icon visible so the user can reopen
+                // sttts: closing the main window QUITS the app — the pill must
+                // go with it. (Upstream hides to tray here; that left the pill
+                // on screen after the user "closed the app".) Cancel any
+                // running dictation first so the shutdown is clean.
+                if window.label() == "main" {
+                    api.prevent_close();
+                    crate::utils::cancel_current_operation(window.app_handle());
+                    window.app_handle().exit(0);
                 }
             }
             tauri::WindowEvent::ThemeChanged(theme) => {
