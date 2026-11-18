@@ -798,6 +798,15 @@ pub fn run(cli_args: CliArgs) {
                 signal_handle::send_transcription_input(app, "transcribe_with_post_process", "CLI");
             } else if args.iter().any(|a| a == "--cancel") {
                 crate::utils::cancel_current_operation(app);
+            } else if args.iter().any(|a| a == "--close-window") {
+                // sttts: route through the real window-close path — `close()`
+                // triggers the CloseRequested handler (cancel + quit), the
+                // same one a user's red button hits. `destroy()` would
+                // bypass it. Used by scripts/loop-test.sh so the quit
+                // behavior is tested without AppleScript GUI automation.
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.close();
+                }
             } else {
                 show_main_window(app);
             }

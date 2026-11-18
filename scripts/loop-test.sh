@@ -8,8 +8,11 @@
 #      starten → Verdict-JSON abwarten (Pill: show → move → persist → restore)
 #   2. Diktat per CLI-Remote-Flag an die laufende Instanz togglen (an/aus) —
 #      die App muss das ohne Crash überleben
-#   3. Hauptfenster per AppleScript schließen → der Prozess MUSS sich beenden
-#      (Fork-Verhalten: close quits, die Pill geht mit weg)
+#   3. Hauptfenster per CLI-Remote-Flag --close-window schließen (ruft
+#      window.close() → derselbe CloseRequested-Pfad wie der rote Button)
+#      → der Prozess MUSS sich beenden (Fork-Verhalten: close quits, die
+#      Pill geht mit weg). Kein AppleScript: läuft ohne Accessibility-
+#      Freigabe, damit cron/CI-fähig.
 #
 # Der Test läuft gegen einen isolierten Portable-Modus (Marker + Data/ neben
 # dem Binary im Debug-Bundle) — er berührt weder die echten App-Daten noch
@@ -105,25 +108,11 @@ wait_pid_gone() {
 }
 
 close_main_window() {
-  local pid="$1"
-  # Hauptfenster anhand des Namens schließen — window 1 wäre ggf. die Pill
-  # („Recording“), deren Close nicht die App beendet. Fällt auf Cmd+W zurück,
-  # nachdem das Hauptfenster fokussiert wurde.
-  osascript >/dev/null 2>&1 <<OSA && return 0
-tell application "System Events"
-  tell (first process whose unix id is $pid)
-    click button 1 of window "handyST"
-  end tell
-end tell
-OSA
-  osascript >/dev/null 2>&1 <<OSA
-tell application "System Events"
-  tell (first process whose unix id is $pid)
-    perform action "AXRaise" of window "handyST"
-  end tell
-end tell
-OSA
-  osascript -e 'tell application "System Events" to keystroke "w" using command down' >/dev/null 2>&1
+  # sttts: --close-window geht an die laufende Instanz und ruft
+  # window.close() auf dem Hauptfenster — derselbe CloseRequested-Pfad wie
+  # der rote Button. Kein AppleScript: der Loop läuft damit ohne
+  # Accessibility-Freigabe (cron/CI-fähig).
+  "$BIN" --close-window >/dev/null 2>&1
 }
 
 log_tail() { tail -n "${1:-40}" "$LOG_FILE" 2>/dev/null || true; }
@@ -138,6 +127,9 @@ for i in $(seq 1 "$ITERATIONS"); do
 
   rm -f "$VERDICT"
   : > /tmp/loop-test-it-$i.log
+  # Leichen vorher räumen: eine halbtote Vorgänger-Instanz verfälscht sonst
+  # pgrep/PID-Checks und konkurriert um den Data-Ordner.
+  pkill -9 -f "$APP_NAME.app/Contents/MacOS/$APP_NAME" 2>/dev/null; sleep 1
 
   # (a) Start mit Pill-Selbsttest — das Verdict ist zugleich der Ready-Marker
   "$BIN" --pill-test >> "/tmp/loop-test-it-$i.log" 2>&1 &

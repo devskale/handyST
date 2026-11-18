@@ -24,6 +24,14 @@ pub struct CliArgs {
     #[arg(long)]
     pub cancel: bool,
 
+    /// sttts: close the main window of the running instance (sent to a
+    /// running instance). Goes through the real CloseRequested handler —
+    /// with the fork's quit-on-close that ends the process. The loop test
+    /// uses this instead of AppleScript GUI automation, so it runs fully
+    /// unattended (no accessibility permission needed).
+    #[arg(long)]
+    pub close_window: bool,
+
     /// sttts: run the pill self-test (show → move → persist → restore →
     /// verify) and write a verdict JSON to the app data dir, then exit.
     #[arg(long)]
