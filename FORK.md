@@ -57,9 +57,14 @@ Diese Dinge sind in echten Merges schon verloren gegangen (Commits als Beleg):
 
 Faustregel nach jedem Merge: `bun run check:translations` grün **und**
 `ls src-tauri/resources/models/silero-vad-v6.2-F32.gguf` existiert **und**
-`cargo test` (in `src-tauri/`) grün **und** App einmal starten
-und Diktat + Pill + Fenster-close testen. `bun run check:model-languages` ist
-**obsolet** (der Fork hat keine lokale Modell-Katalog-Infrastruktur mehr).
+`cargo test` (in `src-tauri/`) grün **und** `bun run loop-test` grün.
+`bun run loop-test` automatisiert den früheren manuellen Smoke-Test (App starten,
+Diktat togglen, Pill, Fenster-Close → App-Ende): baut bei Bedarf das Debug-Bundle,
+fährt die Checks N-mal in einem isolierten Portable-Datenordner (siehe
+`scripts/loop-test.sh`). Der Screen-Check „Pill ist visuell plausibel“ bleibt
+semi-manuell — der Pill-Selbsttest prüft die Geometrie, nicht das Aussehen.
+`bun run check:model-languages` ist **obsolet** (keine lokale Modell-Katalog-
+Infrastruktur mehr).
 
 ## Architektur-Entscheidungen (Upstream-Baum ≠ Fork-Baum)
 
