@@ -28,7 +28,7 @@ use tauri_specta::Event as _;
 /// Sample rate the audio pipeline captures and stores (16 kHz mono PCM).
 pub const SAMPLE_RATE: u32 = 16_000;
 
-fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
+pub fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
     if let Some(message) = payload.downcast_ref::<&str>() {
         (*message).to_string()
     } else if let Some(message) = payload.downcast_ref::<String>() {
@@ -200,20 +200,22 @@ impl TranscriptionManager {
 
         let this = Arc::clone(self);
         std::thread::spawn(move || {
-            let stream = match tauri::async_runtime::block_on(RemoteStream::connect(&cfg, on_partial))
-            {
-                Ok(stream) => Arc::new(stream),
-                Err(e) => {
-                    this.router.open.store(false, Ordering::Release);
-                    this.router.clear_preroll();
-                    warn!("sttts: remote stream failed to connect (batch fallback): {}", e);
-                    return;
-                }
-            };
+            let stream =
+                match tauri::async_runtime::block_on(RemoteStream::connect(&cfg, on_partial)) {
+                    Ok(stream) => Arc::new(stream),
+                    Err(e) => {
+                        this.router.open.store(false, Ordering::Release);
+                        this.router.clear_preroll();
+                        warn!(
+                            "sttts: remote stream failed to connect (batch fallback): {}",
+                            e
+                        );
+                        return;
+                    }
+                };
             *this.router.session.lock().unwrap() = Some(Arc::clone(&stream));
             // Replay what was spoken while the connect was in flight.
-            let preroll: Vec<Vec<f32>> =
-                std::mem::take(&mut *this.router.preroll.lock().unwrap());
+            let preroll: Vec<Vec<f32>> = std::mem::take(&mut *this.router.preroll.lock().unwrap());
             let drained: usize = preroll.iter().map(|f| f.len()).sum();
             for frame in &preroll {
                 stream.feed(frame);
@@ -580,8 +582,7 @@ mod tests {
             selected_language: "auto".to_string(),
             ..Default::default()
         };
-        let evidence =
-            resolve_output_language_evidence(&settings, None);
+        let evidence = resolve_output_language_evidence(&settings, None);
 
         // Too short for a reliable text detection, so the gated "um" must
         // survive; the universal "uhm" is removed regardless.

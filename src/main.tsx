@@ -8,6 +8,13 @@ import {
   getStoredTheme,
   syncThemeFromSettings,
 } from "./lib/utils/theme";
+import { useNoticeStore } from "./stores/noticeStore";
+import { useTranscriptionJobsStore } from "./stores/transcriptionJobsStore";
+
+// sttts: kein modelStore (remote-only) — aber die Job-/Notice-Stores der
+// History-Transkription und des Notices-Frameworks werden initialisiert.
+useNoticeStore.getState().initialize();
+useTranscriptionJobsStore.getState().initialize();
 
 installCompatShims();
 

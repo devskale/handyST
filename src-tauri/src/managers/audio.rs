@@ -1,8 +1,8 @@
 use crate::audio_toolkit::{
     list_input_devices,
     vad::{
-        frames_for_duration_ms, SmoothedVad, VAD_OFFLINE_HANGOVER_MS, VAD_ONSET_MS,
-        VAD_PREFILL_MS, VAD_STREAMING_HANGOVER_MS, VoiceActivityDetector as _,
+        frames_for_duration_ms, SmoothedVad, VoiceActivityDetector as _, VAD_OFFLINE_HANGOVER_MS,
+        VAD_ONSET_MS, VAD_PREFILL_MS, VAD_STREAMING_HANGOVER_MS,
     },
     AudioRecorder, SileroVad, VadPolicy,
 };
@@ -624,7 +624,7 @@ impl AudioRecordingManager {
                 .app_handle
                 .path()
                 .resolve(
-                    "resources/models/silero_vad_v4.onnx",
+                    "resources/models/silero-vad-v6.2-F32.gguf",
                     tauri::path::BaseDirectory::Resource,
                 )
                 .map_err(|e| anyhow::anyhow!("Failed to resolve VAD path: {}", e))?;

@@ -609,8 +609,7 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
                     let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
                     let _ = overlay_window
                         .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
-                } else if let Some((x, y)) = calculate_overlay_position(app_handle, width, height)
-                {
+                } else if let Some((x, y)) = calculate_overlay_position(app_handle, width, height) {
                     let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
                     let _ = overlay_window
                         .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
@@ -724,9 +723,7 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
                     let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
                     let _ = overlay_window
                         .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
-                } else if let Some((x, y)) =
-                    calculate_overlay_position(app_handle, width, height)
-                {
+                } else if let Some((x, y)) = calculate_overlay_position(app_handle, width, height) {
                     let (x, y) = clamp_to_monitor(app_handle, x, y, width, height);
                     let _ = overlay_window
                         .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
@@ -793,7 +790,8 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                     .unwrap_or(false);
                 let _ = tx.send(v);
             });
-            rx.recv_timeout(std::time::Duration::from_secs(3)).unwrap_or(false)
+            rx.recv_timeout(std::time::Duration::from_secs(3))
+                .unwrap_or(false)
         };
 
         let mut results = serde_json::Map::new();
@@ -825,16 +823,13 @@ pub fn run_pill_test(app_handle: &AppHandle) {
             let h2 = handle.clone();
             on_main(Box::new(move || {
                 if let Some(win) = h2.get_webview_window("recording_overlay") {
-                    let _ = win.set_position(tauri::Position::Logical(
-                        tauri::LogicalPosition { x: tx, y: ty },
-                    ));
+                    let _ = win.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                        x: tx,
+                        y: ty,
+                    }));
                 }
             }));
-            if let Err(e) = crate::shortcut::set_overlay_pill_position(
-                handle.clone(),
-                tx,
-                ty,
-            ) {
+            if let Err(e) = crate::shortcut::set_overlay_pill_position(handle.clone(), tx, ty) {
                 log::warn!("sttts: pill test persist failed: {e}");
             }
             std::thread::sleep(std::time::Duration::from_millis(400));
@@ -896,13 +891,14 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                         let my2 = m.position().y as f64 / s;
                         let mw2 = m.size().width as f64 / s;
                         let mh2 = m.size().height as f64 / s;
-                        clamped.map(|(ex, ey)| {
-                            ex >= mx2
-                                && ey >= my2 + 28.0
-                                && ex + 400.0 <= mx2 + mw2
-                                && ey + 170.0 <= my2 + mh2
-                        })
-                        .unwrap_or(false)
+                        clamped
+                            .map(|(ex, ey)| {
+                                ex >= mx2
+                                    && ey >= my2 + 28.0
+                                    && ex + 400.0 <= mx2 + mw2
+                                    && ey + 170.0 <= my2 + mh2
+                            })
+                            .unwrap_or(false)
                     })
                 } else {
                     false
@@ -922,18 +918,11 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                 }),
             );
             let streaming_ok = saved.is_some() && bounds_ok && vis;
-            results.insert(
-                "streaming_clamped".into(),
-                serde_json::json!(streaming_ok),
-            );
+            results.insert("streaming_clamped".into(), serde_json::json!(streaming_ok));
 
             // 5. edge probes (deep eval): a dead-corner position must be
             // rejected by the guard, a valid top-right position accepted.
-            let _ = crate::shortcut::set_overlay_pill_position(
-                handle.clone(),
-                1400.0,
-                10.0,
-            );
+            let _ = crate::shortcut::set_overlay_pill_position(handle.clone(), 1400.0, 10.0);
             let dead_rejected = saved_pill_anchor(&handle)
                 .map(|p| (p.0 - 1400.0).abs() > 1.0 || (p.1 - 10.0).abs() > 1.0)
                 .unwrap_or(true);
@@ -942,11 +931,7 @@ pub fn run_pill_test(app_handle: &AppHandle) {
                 serde_json::json!(dead_rejected),
             );
 
-            let _ = crate::shortcut::set_overlay_pill_position(
-                handle.clone(),
-                1250.0,
-                40.0,
-            );
+            let _ = crate::shortcut::set_overlay_pill_position(handle.clone(), 1250.0, 40.0);
             let valid_accepted = saved_pill_anchor(&handle)
                 .map(|p| (p.0 - 1250.0).abs() <= 1.0 && (p.1 - 40.0).abs() <= 1.0)
                 .unwrap_or(false);
@@ -979,19 +964,15 @@ pub fn run_pill_test(app_handle: &AppHandle) {
             "probe_dead_corner_rejected",
             "probe_top_right_saved",
         ];
-        let ok = CHECKS.iter().all(|k| {
-            results
-                .get(*k)
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false)
-        });
+        let ok = CHECKS
+            .iter()
+            .all(|k| results.get(*k).and_then(|v| v.as_bool()).unwrap_or(false));
         results.insert("ok".into(), serde_json::json!(ok));
 
         if let Ok(path) =
             crate::portable::app_data_dir(&handle).map(|dir| dir.join("pill_test_result.json"))
         {
-            let _ = serde_json::to_string_pretty(&results)
-                .map(|json| std::fs::write(path, json));
+            let _ = serde_json::to_string_pretty(&results).map(|json| std::fs::write(path, json));
         }
         log::info!("sttts: pill self-test verdict: {:?}", results);
     });
@@ -1027,10 +1008,7 @@ fn pill_anchor_on_any_monitor(app_handle: &AppHandle, x: f64, y: f64) -> bool {
         // reserve at the top — the pill is a status-level panel and would
         // otherwise slide behind it, especially top-right.
         const HALF_CARD: f64 = 200.0;
-        x - HALF_CARD >= mx
-            && x + HALF_CARD <= mx + mw
-            && y >= my + 28.0
-            && y <= my + mh - 8.0
+        x - HALF_CARD >= mx && x + HALF_CARD <= mx + mw && y >= my + 28.0 && y <= my + mh - 8.0
     })
 }
 
@@ -1088,13 +1066,7 @@ fn anchor_to_top_left(
 /// This is the last line of defense at show time: a saved idle position is
 /// fine for the small card but the streaming panel is 400px wide and would
 /// otherwise clip off the right edge ("die Pill verschwindet").
-fn clamp_to_monitor(
-    app_handle: &AppHandle,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-) -> (f64, f64) {
+fn clamp_to_monitor(app_handle: &AppHandle, x: f64, y: f64, width: f64, height: f64) -> (f64, f64) {
     // Clamp on the monitor the POSITION itself is on (nearest when outside) —
     // never the cursor's: with the mouse resting on another display, a
     // cursor-based clamp teleported the pill across screens on every show.
@@ -1125,26 +1097,21 @@ fn clamp_to_monitor(
         let mh2 = m.size().height as f64 / s;
         x >= mx2 && x < mx2 + mw2 && y >= my2 && y < my2 + mh2
     };
-    let monitor = monitors
-        .iter()
-        .find(|m| contains(m))
-        .or_else(|| {
-            monitors.iter().min_by(|a, b| {
-                let d = |m: &tauri::Monitor| {
-                    let s = m.scale_factor();
-                    let mx2 = m.position().x as f64 / s;
-                    let my2 = m.position().y as f64 / s;
-                    let mw2 = m.size().width as f64 / s;
-                    let mh2 = m.size().height as f64 / s;
-                    let dx = (x + width / 2.0).clamp(mx2, mx2 + mw2)
-                        - (x + width / 2.0);
-                    let dy = (y + height / 2.0).clamp(my2, my2 + mh2)
-                        - (y + height / 2.0);
-                    dx * dx + dy * dy
-                };
-                d(a).partial_cmp(&d(b)).unwrap_or(std::cmp::Ordering::Equal)
-            })
-        });
+    let monitor = monitors.iter().find(|m| contains(m)).or_else(|| {
+        monitors.iter().min_by(|a, b| {
+            let d = |m: &tauri::Monitor| {
+                let s = m.scale_factor();
+                let mx2 = m.position().x as f64 / s;
+                let my2 = m.position().y as f64 / s;
+                let mw2 = m.size().width as f64 / s;
+                let mh2 = m.size().height as f64 / s;
+                let dx = (x + width / 2.0).clamp(mx2, mx2 + mw2) - (x + width / 2.0);
+                let dy = (y + height / 2.0).clamp(my2, my2 + mh2) - (y + height / 2.0);
+                dx * dx + dy * dy
+            };
+            d(a).partial_cmp(&d(b)).unwrap_or(std::cmp::Ordering::Equal)
+        })
+    });
     let Some(monitor) = monitor else {
         return (x, y);
     };
@@ -1159,7 +1126,6 @@ fn clamp_to_monitor(
         y.clamp(my + TOP_RESERVE, (my + mh - height).max(my + TOP_RESERVE)),
     )
 }
-
 
 /// Generation counter bumped every time the overlay is shown. The delayed
 /// `hide()` below only unmaps the window if no show happened after it was

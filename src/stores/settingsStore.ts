@@ -7,7 +7,6 @@ import type {
   PostProcessApiFormat,
   ChineseScript,
   TranscribeAcceleratorSetting,
-  OrtAcceleratorSetting,
   ShortcutActivation,
 } from "@/bindings";
 import { commands } from "@/bindings";
@@ -95,6 +94,8 @@ const settingUpdaters: {
   start_hidden: (value) => commands.changeStartHiddenSetting(value as boolean),
   autostart_enabled: (value) =>
     commands.changeAutostartSetting(value as boolean),
+  spoken_languages: (value) =>
+    commands.changeSpokenLanguagesSetting(value as string[]),
   update_checks_enabled: (value) =>
     commands.changeUpdateChecksSetting(value as boolean),
   show_whats_new_on_update: (value) =>

@@ -93,17 +93,15 @@ fn windows_taskbar_theme() -> Option<AppTheme> {
 
 /// Gets the appropriate icon path for the given theme and state.
 ///
-/// `warning` overlays a badge on the idle icon while keyboard shortcuts are
-/// blocked (macOS Secure Input); recording/transcribing states keep their
-/// normal icons so in-flight activity stays recognizable.
-pub fn get_icon_path(theme: AppTheme, state: TrayIconState, warning: bool) -> &'static str {
-    if warning && state == TrayIconState::Idle {
+/// `badge` marks the idle icon while something needs attention (a notice, or
+/// macOS Secure Input). Busy states keep their normal icons. The menu line says
+/// what's wrong, so the badge doesn't vary by level.
+pub fn get_icon_path(theme: AppTheme, state: TrayIconState, badge: bool) -> &'static str {
+    if badge && state == TrayIconState::Idle {
         return match theme {
             AppTheme::Dark => "resources/tray_idle_warning.png",
             AppTheme::Light => "resources/tray_idle_warning_dark.png",
-            // Linux never sets the warning flag (Secure Input is macOS-only),
-            // but fall back to the normal icon just in case.
-            AppTheme::Colored => "resources/handy.png",
+            AppTheme::Colored => "resources/handy_warning.png",
         };
     }
     match (theme, state) {
@@ -182,6 +180,15 @@ fn version_label() -> String {
 /// sttts compat for upstream's single-writer tray callers.
 pub fn set_tray_state(app: &AppHandle, _state: TrayIconState) {
     update_tray_menu(app, None);
+}
+
+/// Whether a dictation is recording or transcribing — the tray icon is the
+/// record of that, so the background transcription jobs yield to it.
+pub fn dictation_in_progress(app: &AppHandle) -> bool {
+    matches!(
+        app.state::<CurrentTrayIconState>().get(),
+        TrayIconState::Recording | TrayIconState::Transcribing
+    )
 }
 
 pub fn update_tray_menu(app: &AppHandle, locale: Option<&str>) {
@@ -281,9 +288,9 @@ pub fn update_tray_menu(app: &AppHandle, locale: Option<&str>) {
                     &separator(),
                     &dictate_i,
                     &copy_last_transcript_i,
-                &separator(),
-                &settings_i,
-                &check_updates_i,
+                    &separator(),
+                    &settings_i,
+                    &check_updates_i,
                     &separator(),
                     &quit_i,
                 ],
@@ -295,10 +302,14 @@ pub fn update_tray_menu(app: &AppHandle, locale: Option<&str>) {
     // Both layouts start with [version, separator, ...]; slot the warning in
     // right below the version line so it's the first actionable thing seen.
     let mut tooltip = version_label;
+    let mut position = 2;
     if let Some(warning_item) = secure_input_warning {
         let _ = menu.insert(&warning_item, 2);
         let _ = menu.insert(&separator(), 3);
         tooltip = format!("{} — {}", tooltip, warning_item.text().unwrap_or_default());
+    }
+    if position > 2 {
+        let _ = menu.insert(&separator(), position);
     }
 
     let tray = app.state::<TrayIcon>();
@@ -369,6 +380,9 @@ mod tests {
             post_processed_text: post_processed.map(|text| text.to_string()),
             post_process_prompt: None,
             post_process_requested: false,
+            source_name: None,
+            language: None,
+            language_source: None,
         }
     }
 

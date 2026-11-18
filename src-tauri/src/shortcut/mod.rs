@@ -23,8 +23,9 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::settings::APPLE_INTELLIGENCE_DEFAULT_MODEL_ID;
 use crate::settings::{
     self, get_settings, AutoSubmitKey, ChineseScript, ClipboardHandling, KeyboardImplementation,
-    LLMPrompt, OverlayPosition, OverlayStyle, PasteMethod, ShortcutBinding, SoundTheme, Theme,
-    TypingTool, APPLE_INTELLIGENCE_PROVIDER_ID,
+    LLMPrompt, LanguageDetectionMode, OverlayPosition, OverlayStyle, PasteMethod,
+    ShortcutActivation, ShortcutBinding, SoundTheme, Theme, TypingTool, VadBackend,
+    APPLE_INTELLIGENCE_PROVIDER_ID,
 };
 use crate::tray;
 
@@ -52,6 +53,9 @@ pub fn init_shortcuts(app: &AppHandle) {
 
                 tauri_impl::init_shortcuts(app);
             }
+        }
+        KeyboardImplementation::None => {
+            info!("Built-in keyboard shortcuts disabled; use CLI flags or signals");
         }
     }
 }
@@ -154,6 +158,7 @@ pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<()
     match settings.keyboard_implementation {
         KeyboardImplementation::Tauri => tauri_impl::register_shortcut(app, binding),
         KeyboardImplementation::HandyKeys => handy_keys::register_shortcut(app, binding),
+        KeyboardImplementation::None => Ok(()),
     }
 }
 
@@ -163,6 +168,7 @@ pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<
     match settings.keyboard_implementation {
         KeyboardImplementation::Tauri => tauri_impl::unregister_shortcut(app, binding),
         KeyboardImplementation::HandyKeys => handy_keys::unregister_shortcut(app, binding),
+        KeyboardImplementation::None => Ok(()),
     }
 }
 
@@ -443,6 +449,7 @@ pub fn get_keyboard_implementation(app: AppHandle) -> String {
     match settings.keyboard_implementation {
         KeyboardImplementation::Tauri => "tauri".to_string(),
         KeyboardImplementation::HandyKeys => "handy_keys".to_string(),
+        KeyboardImplementation::None => "none".to_string(),
     }
 }
 
@@ -458,6 +465,7 @@ fn validate_shortcut_for_implementation(
     match implementation {
         KeyboardImplementation::Tauri => tauri_impl::validate_shortcut(raw),
         KeyboardImplementation::HandyKeys => handy_keys::validate_shortcut(raw),
+        KeyboardImplementation::None => Ok(()),
     }
 }
 
@@ -466,6 +474,7 @@ fn parse_keyboard_implementation(s: &str) -> KeyboardImplementation {
     match s {
         "tauri" => KeyboardImplementation::Tauri,
         "handy_keys" => KeyboardImplementation::HandyKeys,
+        "none" => KeyboardImplementation::None,
         other => {
             warn!(
                 "Invalid keyboard implementation '{}', defaulting to tauri",
@@ -489,6 +498,7 @@ fn unregister_all_shortcuts(app: &AppHandle, implementation: KeyboardImplementat
         let result = match implementation {
             KeyboardImplementation::Tauri => tauri_impl::unregister_shortcut(app, binding),
             KeyboardImplementation::HandyKeys => handy_keys::unregister_shortcut(app, binding),
+            KeyboardImplementation::None => Ok(()),
         };
 
         if let Err(e) = result {
@@ -547,6 +557,7 @@ fn register_all_shortcuts_for_implementation(
         let result = match implementation {
             KeyboardImplementation::Tauri => tauri_impl::register_shortcut(app, binding),
             KeyboardImplementation::HandyKeys => handy_keys::register_shortcut(app, binding),
+            KeyboardImplementation::None => Ok(()),
         };
 
         if let Err(e) = result {
@@ -709,8 +720,31 @@ pub fn apply_window_theme(app: &AppHandle, theme: Theme) {
 #[specta::specta]
 pub fn change_selected_language_setting(app: AppHandle, language: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
-    settings.selected_language = language;
+    settings.selected_language = language.clone();
     settings::write_settings(&app, settings);
+    tray::update_tray_menu(&app, None);
+
+    // The tray can change it too; keep the settings window in sync.
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({
+            "setting": "selected_language",
+            "value": language
+        }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_spoken_languages_setting(
+    app: AppHandle,
+    languages: Vec<String>,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.spoken_languages = languages;
+    settings::write_settings(&app, settings);
+    tray::update_tray_menu(&app, None);
     Ok(())
 }
 
@@ -909,6 +943,29 @@ pub fn change_word_correction_threshold_setting(
 ) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.word_correction_threshold = threshold;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_language_detection_setting(
+    app: AppHandle,
+    mode: LanguageDetectionMode,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.language_detection = mode;
+    settings::write_settings(&app, settings);
+    tray::update_tray_menu(&app, None);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_language_detection_window_setting(app: AppHandle, secs: u32) -> Result<(), String> {
+    let (min, max) = settings::LANGUAGE_DETECTION_WINDOW_SECS.into_inner();
+    let mut settings = settings::get_settings(&app);
+    settings.language_detection_window_secs = secs.clamp(min, max);
     settings::write_settings(&app, settings);
     Ok(())
 }
@@ -1421,8 +1478,6 @@ pub fn change_show_tray_icon_setting(app: AppHandle, enabled: bool) -> Result<()
     Ok(())
 }
 
-
-
 // sttts: remote transcription settings. The API key goes to the OS keychain
 // (never settings.json); the rest are plain settings fields.
 #[tauri::command]
@@ -1527,9 +1582,7 @@ pub struct RemoteCheckResult {
 /// assumption.
 #[tauri::command]
 #[specta::specta]
-pub async fn check_remote_transcription(
-    app: AppHandle,
-) -> Result<RemoteCheckResult, String> {
+pub async fn check_remote_transcription(app: AppHandle) -> Result<RemoteCheckResult, String> {
     let user_settings = settings::get_settings(&app);
     let base_url = user_settings
         .remote_transcription_base_url
@@ -1623,7 +1676,11 @@ pub async fn check_remote_transcription(
         Ok(r) => {
             let status = r.status();
             let detail = if status.is_success() {
-                format!("HTTP {} in {:.2}s", status.as_u16(), t0.elapsed().as_secs_f32())
+                format!(
+                    "HTTP {} in {:.2}s",
+                    status.as_u16(),
+                    t0.elapsed().as_secs_f32()
+                )
             } else {
                 let body = r.text().await.unwrap_or_default();
                 format!(

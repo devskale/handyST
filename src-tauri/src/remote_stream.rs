@@ -134,10 +134,11 @@ impl RemoteStream {
             );
         }
 
-        let (ws, _resp) = tokio::time::timeout(CONNECT_TIMEOUT, tokio_tungstenite::connect_async(request))
-            .await
-            .map_err(|_| format!("connect to {url} timed out"))?
-            .map_err(|e| format!("connect to {url} failed: {e}"))?;
+        let (ws, _resp) =
+            tokio::time::timeout(CONNECT_TIMEOUT, tokio_tungstenite::connect_async(request))
+                .await
+                .map_err(|_| format!("connect to {url} timed out"))?
+                .map_err(|e| format!("connect to {url} failed: {e}"))?;
 
         let (feed_tx, feed_rx) = mpsc::channel::<StreamFrame>();
         let (result_tx, result_rx) = mpsc::channel::<Result<String, String>>();

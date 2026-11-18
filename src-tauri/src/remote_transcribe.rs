@@ -45,7 +45,7 @@ pub fn f32_to_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
     wav.extend_from_slice(&(sample_rate * 2).to_le_bytes()); // byte rate
     wav.extend_from_slice(&2u16.to_le_bytes()); // block align
     wav.extend_from_slice(&16u16.to_le_bytes()); // bits
-    // data chunk
+                                                 // data chunk
     wav.extend_from_slice(b"data");
     wav.extend_from_slice(&data_len.to_le_bytes());
     wav.extend_from_slice(&crate::utils::f32_to_pcm16_bytes(samples));
@@ -96,14 +96,20 @@ pub async fn remote_transcribe(
         .map_err(|e| e.to_string())?;
 
     let t0 = std::time::Instant::now();
-    let resp = client.post(&url).multipart(form).send().await.map_err(|e| {
-        format!("request to {url} failed: {e}")
-    })?;
+    let resp = client
+        .post(&url)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| format!("request to {url} failed: {e}"))?;
 
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("endpoint returned {status}: {}", body.chars().take(300).collect::<String>()));
+        return Err(format!(
+            "endpoint returned {status}: {}",
+            body.chars().take(300).collect::<String>()
+        ));
     }
 
     let parsed: TranscriptionResponse = resp

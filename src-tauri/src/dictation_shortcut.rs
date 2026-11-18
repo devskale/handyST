@@ -308,7 +308,7 @@ mod tests {
         let t0 = Instant::now();
         assert!(!d.on_watched_tap(t0));
         d.on_other_activity(); // e.g. the "C" in Ctrl+C
-        // The shortcut-paired press must NOT complete the double-tap…
+                               // The shortcut-paired press must NOT complete the double-tap…
         assert!(!d.on_watched_tap(t0 + Duration::from_millis(100)));
         // …but it becomes a fresh first tap, so a following clean tap fires —
         // two real taps after the shortcut are a genuine double-tap (macOS
@@ -329,8 +329,14 @@ mod tests {
     #[test]
     fn trigger_parsing_roundtrip() {
         assert_eq!(Trigger::from_setting("mic_key"), Some(Trigger::MicKey));
-        assert_eq!(Trigger::from_setting("globe_double"), Some(Trigger::GlobeDouble));
-        assert_eq!(Trigger::from_setting("opt_right_double"), Some(Trigger::OptRightDouble));
+        assert_eq!(
+            Trigger::from_setting("globe_double"),
+            Some(Trigger::GlobeDouble)
+        );
+        assert_eq!(
+            Trigger::from_setting("opt_right_double"),
+            Some(Trigger::OptRightDouble)
+        );
         assert_eq!(Trigger::from_setting("none"), None);
         assert_eq!(Trigger::from_setting(""), None);
     }

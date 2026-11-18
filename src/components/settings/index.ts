@@ -17,8 +17,6 @@ export { ShortcutBehaviorSelector } from "./general/RecordingModeSelector";
 export { DictationShortcutSelector } from "./general/DictationShortcutSelector";
 export { AudioFeedback } from "./AudioFeedback";
 export { ShowOverlay } from "./ShowOverlay";
-export { GlobalShortcutInput } from "./GlobalShortcutInput";
-export { HandyKeysShortcutInput } from "./HandyKeysShortcutInput";
 export { ShortcutInput } from "./ShortcutInput";
 export { CustomWords } from "./CustomWords";
 export { PostProcessingToggle } from "./PostProcessingToggle";

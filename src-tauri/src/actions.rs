@@ -2,9 +2,9 @@
 use crate::apple_intelligence;
 use crate::audio_feedback::{play_feedback_sound, play_feedback_sound_blocking, SoundType};
 use crate::audio_toolkit::{is_microphone_access_denied, is_no_input_device_error, VadPolicy};
+use crate::chinese_script::{convert_chinese_script, ChineseVariety};
 use crate::managers::audio::AudioRecordingManager;
 use crate::managers::history::HistoryManager;
-use crate::chinese_script::{convert_chinese_script, ChineseVariety};
 use crate::managers::transcription::{language_hint, StreamWorkKind, TranscriptionManager};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -356,6 +356,9 @@ pub(crate) struct ProcessedTranscription {
     pub final_text: String,
     pub post_processed_text: Option<String>,
     pub post_process_prompt: Option<String>,
+    /// sttts: the fork skips post-processing silently (upstream reports the
+    /// failure as a notice); always `false` today, wired for the job manager.
+    pub post_process_failed: bool,
 }
 
 /// Rewrite Chinese output into the configured script. Gated on the effective
@@ -370,7 +373,7 @@ fn maybe_convert_chinese_variant(
 ) -> Option<String> {
     let script = match effective_language {
         "zh-Hans" | "zh-CN" => ChineseScript::Simplified,
-        "zh-Hant" | "zh-TW" | "zh-HK" => ChineseScript::Traditional,
+        "zh-Hant" | "zh-TW" | "zh-HK" => ChineseScript::TraditionalTw,
         _ => settings.chinese_script,
     };
     if script == ChineseScript::AsTranscribed {
@@ -443,6 +446,7 @@ pub(crate) async fn process_transcription_output(
         final_text,
         post_processed_text,
         post_process_prompt,
+        post_process_failed: false,
     }
 }
 
@@ -636,8 +640,7 @@ impl ShortcutAction for TranscribeAction {
         // streaming panel (switching to a working spinner while the final is
         // delivered); every other path uses the compact transcribing pill.
         let overlay_style = get_settings(app).overlay_style;
-        let use_streaming_overlay =
-            should_use_streaming_overlay(overlay_style, tm.is_streaming());
+        let use_streaming_overlay = should_use_streaming_overlay(overlay_style, tm.is_streaming());
         if use_streaming_overlay {
             tm.emit_stream_working(StreamWorkKind::Transcribing);
         } else {
@@ -861,6 +864,7 @@ impl ShortcutAction for TranscribeAction {
                                     post_process,
                                     processed.post_processed_text.clone(),
                                     processed.post_process_prompt.clone(),
+                                    None,
                                 ) {
                                     error!("Failed to save history entry: {}", err);
                                 }
@@ -883,7 +887,7 @@ impl ShortcutAction for TranscribeAction {
                                     }
 
                                     match utils::paste(final_text, ah_clone.clone()) {
-                                        Ok(()) => debug!(
+                                        Ok(_) => debug!(
                                             "Text pasted successfully in {:?}",
                                             paste_time.elapsed()
                                         ),
@@ -928,6 +932,7 @@ impl ShortcutAction for TranscribeAction {
                                     file_name,
                                     String::new(),
                                     post_process,
+                                    None,
                                     None,
                                     None,
                                 ) {
